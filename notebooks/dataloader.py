@@ -172,19 +172,15 @@ def read_rtma(fin):
 def read_nwp(fin):
     grbs = pygrib.open(fin)
     Ds = []
-    lat, lon, validDATE = None, None, None
     for i, grb in enumerate(grbs[:]):
 
         name = grb.parameterName
 
-        if name in ['Temperature', 'Dew point temperature']:
+        if name in ['Temperature']:
             level = grb.level
             if level >= 100 and level <= 1000:
-                if not any((lat, lon, validDATE)):
-                    value, lat, lon = grb.data()
-                    validDATE = grb.validDate
-                else:
-                    value, _, _ = grb.data()
+                value, lat, lon = grb.data()
+                validDATE = grb.validDate
                 level_units = grb.typeOfLevel
 
                 Ds.append({'data': value, 'lat': lat, 'lon': lon,
