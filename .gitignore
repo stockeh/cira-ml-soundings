@@ -12,3 +12,5 @@ ipython_config.py
 
 # Environments
 .env
+logs/
+.DS_Store
