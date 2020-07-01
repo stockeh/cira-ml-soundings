@@ -1,8 +1,9 @@
-import numpy as np
+import datetime
 import warnings
+import numpy as np
 import pygrib
-
 from netCDF4 import Dataset
+from scipy import interpolate
 
 ########################################
 #
@@ -13,7 +14,8 @@ from netCDF4 import Dataset
 # read_rtma
 # read_nwp
 # read_sonde
-#
+# read_radiosonde_launch
+
 ########################################
 
 
@@ -258,3 +260,67 @@ def read_sonde(fin):
         experiments.append({'metadata': metadata, 'data': data})
 
     return experiments
+
+
+def read_radiosonde_launch(dataset, rec, interpolate_dim=256):
+    """
+    Read NetCDF formatted radiosonde for a specific launch
+    Inputs:
+
+    Outputs:
+
+    """
+    lat, lon = dataset['staLat'][rec].values, dataset['staLon'][rec].values
+    date = datetime.datetime.fromtimestamp(dataset['relTime'][rec].values)
+    metadata = {'date': date, 'lat': lat, 'lon': lon}
+
+    numMand = dataset['numMand'][rec].values
+    numSigT = dataset['numSigT'][rec].values
+    numSigW = dataset['numSigW'][rec].values
+    numTrop = dataset['numTrop'][rec].values
+    numMwnd = dataset['numMwnd'][rec].values
+
+    mand = np.vstack((dataset['prMan'][rec].values[:numMand], dataset['tpMan'][rec].values[:numMand],
+                      dataset['tdMan'][rec].values[:numMand], dataset['wsMan'][rec].values[:numMand],
+                      dataset['wdMan'][rec].values[:numMand])).T
+    sigT = np.vstack((dataset['prSigT'][rec].values[:numSigT], dataset['tpSigT'][rec].values[:numSigT],
+                      dataset['tdSigT'][rec].values[:numSigT], dataset['wsSigT'][rec].values[:numSigT],
+                      dataset['wdSigT'][rec].values[:numSigT])).T
+    sigW = np.vstack((dataset['prSigW'][rec].values[:numSigW], dataset['tpSigW'][rec].values[:numSigW],
+                      dataset['tdSigW'][rec].values[:numSigW], dataset['wsSigW'][rec].values[:numSigW],
+                      dataset['wdSigW'][rec].values[:numSigW])).T
+    trop = np.vstack((dataset['prTrop'][rec].values[:numTrop], dataset['tpTrop'][rec].values[:numTrop],
+                      dataset['tdTrop'][rec].values[:numTrop], dataset['wsTrop'][rec].values[:numTrop],
+                      dataset['wdTrop'][rec].values[:numTrop])).T
+    mwnd = np.vstack((dataset['prMaxW'][rec].values[:numMwnd], dataset['tpMaxW'][rec].values[:numMwnd],
+                      dataset['tdMaxW'][rec].values[:numMwnd], dataset['wsMaxW'][rec].values[:numMwnd],
+                      dataset['wdMaxW'][rec].values[:numMwnd])).T
+
+    # P, T, Dp, Ws, Wd
+    og_profile = np.concatenate((mand, sigT, sigW, trop, mwnd))
+    og_profile = og_profile[og_profile[:, 0].argsort()][::-1]
+
+    dims = og_profile.shape[1]
+
+    # interpolate nan values
+    for i in range(1, dims):
+        y = og_profile[:, i]
+        nans, x = np.isnan(y), lambda z: z.nonzero()[0]
+        # y[nans] = np.interp(x(nans), x(~nans), y[~nans])
+        f = interpolate.interp1d(x(~nans), y[~nans], kind='linear', bounds_error=False,
+                                 fill_value=(y[~nans][0], y[~nans][-1]))
+        y[nans] = f(x(nans))
+
+    # convert Dew Point Depression to Dew Point Temperature
+    og_profile[:, 2] = -(og_profile[:, 2] - og_profile[:, 1]) - 273.15
+    og_profile[:, 1] -= 273.15
+
+    interpolate_dim = 256
+    profile = np.zeros((interpolate_dim, dims))
+
+    for i in range(dims):
+        y = og_profile[:, i]
+        f = interpolate.interp1d(np.arange(len(y)), y, kind='linear')
+        profile[:, i] = f(np.linspace(0, len(y) - 1, interpolate_dim))
+
+    return profile, metadata
