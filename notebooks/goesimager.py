@@ -11,6 +11,36 @@ import xarray as xr
 from pyproj import Proj
 
 
+class GOES16ABICache(object):
+
+    def __init__(self, time_range_minutes=3, cache_size=5):
+        self.time_range_minutes = time_range_minutes
+        self.goes_collection = []
+        self.cache_size = cache_size
+
+    def get_goes(self, time):
+        if not isinstance(time, pd.Timestamp):
+            time = pd.Timestamp(time, unit='s', tz='UTC')
+        for i, goes in enumerate(self.goes_collection):
+            if np.abs(time - goes.date) <= pd.Timedelta(minutes=self.time_range_minutes):
+                return goes
+        return None
+
+    def put_goes(self, goes):
+        if len(self.goes_collection) > self.cache_size:
+            rem_goes = self.goes_collection[0]
+            self.goes_collection = self.goes_collection[1:]
+            rem_goes.close()
+            del rem_goes
+        self.goes_collection.append(goes)
+
+    def clear(self):
+        for rem_goes in self.goes_collection:
+            rem_goes.close()
+            del rem_goes
+        self.goes_collection = []
+
+
 class GOES16ABI(object):
     """
     Handles data I/O and map projections for GOES-16 Advanced Baseline Imager data.
@@ -33,23 +63,25 @@ class GOES16ABI(object):
         self.path = path
         self.bands = bands
         self.time_range_minutes = time_range_minutes
+
         self.goes16_ds = dict()
         self.channel_files = []
         for band in bands:
-            self.channel_files.append(self.goes16_abi_filename(band))
+            self.channel_files.append(self._goes16_abi_filename(band))
             self.goes16_ds[band] = xr.open_dataset(self.channel_files[-1])
-        self.proj = self.goes16_projection()
+
+        self.proj = self._goes16_projection()
         self.x = None
         self.y = None
         self.x_g = None
         self.y_g = None
         self.lon = None
         self.lat = None
-        self.sat_coordinates()
-        self.lon_lat_coords()
+        self._sat_coordinates()
+        self._lon_lat_coords()
 
     @staticmethod
-    def abi_file_dates(files, file_date='e'):
+    def _abi_file_dates(files, file_date='e'):
         """
         Extract the file creation dates from a list of GOES-16 files.
         Date format: Year (%Y), Day of Year (%j), Hour (%H), Minute (%M), Second (%s), Tenth of a second
@@ -70,7 +102,7 @@ class GOES16ABI(object):
                                "%Y%j%H%M%S") for c_file in files], tz='UTC')
         return channel_dates
 
-    def goes16_abi_filename(self, channel):
+    def _goes16_abi_filename(self, channel):
         """
         Given a path to a dataset of GOES-16 files, find the netCDF file that matches the expected
         date and channel, or band number.
@@ -86,7 +118,7 @@ class GOES16ABI(object):
         channel_files = np.array(sorted(glob(join(self.path, self.date.strftime('%Y'), self.date.strftime('%Y_%m_%d_%j'),
                                                   f"OR_ABI-L1b-RadC-M*C{channel:02d}_G16_*.nc"))))
         # print("channel_files", channel_files)
-        channel_dates = self.abi_file_dates(channel_files)
+        channel_dates = self._abi_file_dates(channel_files)
         # print("channel_dates", channel_dates)
         date_diffs = np.abs(channel_dates - self.date)
         # print("Date_diffs", date_diffs)
@@ -102,7 +134,7 @@ class GOES16ABI(object):
             filename = channel_files[np.argmin(date_diffs)]
         return filename
 
-    def goes16_projection(self):
+    def _goes16_projection(self):
         """
         Create a Pyproj projection object with the projection information from a GOES-16 file.
         The geostationary map projection is described in the
@@ -116,7 +148,7 @@ class GOES16ABI(object):
                          sweep=goes16_ds["goes_imager_projection"].attrs["sweep_angle_axis"])
         return Proj(projparams=proj_dict)
 
-    def sat_coordinates(self):
+    def _sat_coordinates(self):
         """
         Calculate the geostationary projection x and y coordinates in m for each pixel in the image.
         """
@@ -126,14 +158,14 @@ class GOES16ABI(object):
         self.y = goes16_ds["y"].values * sat_height
         self.x_g, self.y_g = np.meshgrid(self.x, self.y)
 
-    def parallel_lon_lat_coords(self, cols, s):
+    def _parallel_lon_lat_coords(self, cols, s):
         """
         Allow for sections of the longitude and latitude to be calculated in parallel.
         """
         self.lon[:, s:s+cols], self.lat[:, s:s+cols] = self.proj(
             self.x_g[:, s:s+cols], self.y_g[:, s:s+cols], inverse=True)
 
-    def lon_lat_coords(self):
+    def _lon_lat_coords(self):
         """
         Calculate longitude and latitude coordinates for each point in the GOES-16 image.
         """
@@ -143,7 +175,7 @@ class GOES16ABI(object):
         self.lat = np.zeros(self.x_g.shape)
         with concurrent.futures.ThreadPoolExecutor(max_workers=threads) as executor:
             for section in [cols * i for i in range(threads)]:
-                executor.submit(self.parallel_lon_lat_coords, cols, section)
+                executor.submit(self._parallel_lon_lat_coords, cols, section)
         self.lon[self.lon > 1e10] = np.nan
         self.lat[self.lat > 1e10] = np.nan
 
@@ -169,7 +201,6 @@ class GOES16ABI(object):
                           int(center_col + x_size_pixels // 2))
         patch = np.zeros((1, self.bands.size, y_size_pixels,
                           x_size_pixels), dtype=np.float32)
-
         for b, band in enumerate(self.bands):
             """
             Converting Spectral Radiance to BT (bands 7-16)
@@ -187,8 +218,7 @@ class GOES16ABI(object):
                     patch[0, b, :, :] = self.goes16_ds[band]["Rad"][row_slice,
                                                                     col_slice].values
             except ValueError as ve:
-                raise ValueError(
-                    f'Central Lon ({center_lon:.3f}) and Lat ({center_lat:.3f}) does not exist in GOES-16 projection.')
+                raise ve
 
         lons = self.lon[row_slice, col_slice]
         lats = self.lat[row_slice, col_slice]
@@ -199,6 +229,17 @@ class GOES16ABI(object):
         for band in self.bands:
             self.goes16_ds[band].close()
             del self.goes16_ds[band]
+
+
+def valide_lon_lat(lon, lat):
+    """
+    Bounds for longitude + latitude 
+    """
+    top = 49.3457868  # north lat
+    left = -124.7844079  # west long
+    right = -66.9513812  # east long
+    bottom = 24.7433195  # south lat
+    return bottom <= lat <= top and left <= lon <= right
 
 
 def extract_abi_patches(radiosonde_path, abi_path, patch_path, bands=np.array([8, 9, 10, 11, 13, 14, 15, 16]),
@@ -240,32 +281,53 @@ def extract_abi_patches(radiosonde_path, abi_path, patch_path, bands=np.array([8
         (times.size, patch_y_length_pixels, patch_x_length_pixels), dtype=np.float32)
     is_valid = np.ones((times.size), dtype=bool)
 
-    for t, time in enumerate(times):
-        try:
-            goes16_abi_timestep = GOES16ABI(
-                abi_path, time, bands, time_range_minutes=time_range_minutes)
+    goes16_cache = GOES16ABICache(
+        time_range_minutes=int(time_range_minutes//1.5), cache_size=10)
+    goes16_abi_timestep = None
 
+    for t, time in enumerate(times):
+
+        if not valide_lon_lat(lons[t], lats[t]):
+            print(t, f'Central Lon ({lons[t]:.3f}) and Lat ({lats[t]:.3f}) '
+                     f'does not exist in GOES-16 projection.')
+            is_valid[t] = False
+            continue
+
+        try:
+            cached_goes16 = goes16_cache.get_goes(time)
+            goes16_abi_timestep = GOES16ABI(abi_path, time, bands, time_range_minutes=time_range_minutes) \
+                if cached_goes16 is None else cached_goes16
+
+        except FileNotFoundError as fnfe:  # likely missing a file for all bands
+            print(t, fnfe)
+            is_valid[t] = False
+            continue
+
+        if cached_goes16 is None:
+            goes16_cache.put_goes(goes16_abi_timestep)
+
+        try:
             patches[t], \
                 patch_lons[t], \
                 patch_lats[t] = goes16_abi_timestep.extract_image_patch(lons[t], lats[t], patch_x_length_pixels,
                                                                         patch_y_length_pixels, bt=bt)
-            goes16_abi_timestep.close()
-            del goes16_abi_timestep
-        except (FileNotFoundError, ValueError) as e:
-            print(t, e)
+        except ValueError as ve:  # likely invalid lon/lat
+            print(t, ve)
             is_valid[t] = False
+
+    goes16_cache.clear()
 
     x_coords = np.arange(patch_x_length_pixels)
     y_coords = np.arange(patch_y_length_pixels)
     valid_patches = np.where(is_valid)[0]
     patch_num = np.arange(valid_patches.shape[0])
-    print(patch_num, patches.shape, patches[valid_patches].shape, bands)
-    patch_ds = xr.Dataset(data_vars={"abi": (("patch", "band", "y", "x"), patches[valid_patches]),
-                                     "time": (("patch", ), times[valid_patches]),
-                                     "lon": (("patch", "y", "x"), patch_lons[valid_patches]),
-                                     "lat": (("patch", "y", "x"), patch_lats[valid_patches])},
-                          coords={"patch": patch_num,
-                                  "y": y_coords, "x": x_coords, "band": bands})
+
+    patch_ds = xr.Dataset(data_vars={"abi": (("samples", "band", "y", "x"), patches[valid_patches]),
+                                     "time": (("samples", ), times[valid_patches]),
+                                     "lon": (("samples", "y", "x"), patch_lons[valid_patches]),
+                                     "lat": (("samples", "y", "x"), patch_lats[valid_patches])},
+                          coords={"samples": patch_num,
+                                  "y": y_coords, "x": x_coords, "bands": bands})
 
     out_file = join(patch_path, "abi_patches_{0}.nc".format('TEST'))
 
