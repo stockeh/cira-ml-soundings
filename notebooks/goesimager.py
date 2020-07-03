@@ -1,3 +1,4 @@
+import concurrent.futures
 import time as cpytime
 from datetime import datetime
 from glob import glob
@@ -93,8 +94,10 @@ class GOES16ABI(object):
             minutes=self.time_range_minutes))[0]
         # print("File_index", file_index)
         if len(file_index) == 0:
+            diff = (date_diffs.total_seconds().values.min() /
+                    60) if len(date_diffs) != 0 else float('inf')
             raise FileNotFoundError('No GOES-16 files within {0:d} minutes of '.format(self.time_range_minutes) + self.date.strftime(
-                "%Y-%m-%d %H:%M:%S" + ". Nearest file is within {0:.3f} minutes".format(date_diffs.total_seconds().values.min() / 60)))
+                "%Y-%m-%d %H:%M:%S" + ". Nearest file is within {0:.3f} minutes".format(diff)))
         else:
             filename = channel_files[np.argmin(date_diffs)]
         return filename
@@ -123,11 +126,24 @@ class GOES16ABI(object):
         self.y = goes16_ds["y"].values * sat_height
         self.x_g, self.y_g = np.meshgrid(self.x, self.y)
 
+    def parallel_lon_lat_coords(self, cols, s):
+        """
+        Allow for sections of the longitude and latitude to be calculated in parallel.
+        """
+        self.lon[:, s:s+cols], self.lat[:, s:s+cols] = self.proj(
+            self.x_g[:, s:s+cols], self.y_g[:, s:s+cols], inverse=True)
+
     def lon_lat_coords(self):
         """
         Calculate longitude and latitude coordinates for each point in the GOES-16 image.
         """
-        self.lon, self.lat = self.proj(self.x_g, self.y_g, inverse=True)
+        threads = 10
+        cols = self.x_g.shape[1] // threads
+        self.lon = np.zeros(self.x_g.shape)
+        self.lat = np.zeros(self.x_g.shape)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=threads) as executor:
+            for section in [cols * i for i in range(threads)]:
+                executor.submit(self.parallel_lon_lat_coords, cols, section)
         self.lon[self.lon > 1e10] = np.nan
         self.lat[self.lat > 1e10] = np.nan
 
@@ -228,6 +244,7 @@ def extract_abi_patches(radiosonde_path, abi_path, patch_path, bands=np.array([8
         try:
             goes16_abi_timestep = GOES16ABI(
                 abi_path, time, bands, time_range_minutes=time_range_minutes)
+
             patches[t], \
                 patch_lons[t], \
                 patch_lats[t] = goes16_abi_timestep.extract_image_patch(lons[t], lats[t], patch_x_length_pixels,
@@ -235,14 +252,14 @@ def extract_abi_patches(radiosonde_path, abi_path, patch_path, bands=np.array([8
             goes16_abi_timestep.close()
             del goes16_abi_timestep
         except (FileNotFoundError, ValueError) as e:
-            print(e)
+            print(t, e)
             is_valid[t] = False
 
     x_coords = np.arange(patch_x_length_pixels)
     y_coords = np.arange(patch_y_length_pixels)
     valid_patches = np.where(is_valid)[0]
     patch_num = np.arange(valid_patches.shape[0])
-
+    print(patch_num, patches.shape, patches[valid_patches].shape, bands)
     patch_ds = xr.Dataset(data_vars={"abi": (("patch", "band", "y", "x"), patches[valid_patches]),
                                      "time": (("patch", ), times[valid_patches]),
                                      "lon": (("patch", "y", "x"), patch_lons[valid_patches]),
