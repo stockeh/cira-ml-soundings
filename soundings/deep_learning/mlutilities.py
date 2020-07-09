@@ -27,16 +27,27 @@ def rmse(A, B):
 ######################################################################
 
 
-def partition(X, T, trainFraction, shuffle=False, classification=False):
+def partition(X, T, percentages, shuffle=False, classification=False):
     """Usage: Xtrain,Train,Xvalidate,Tvalidate,Xtest,Ttest = partition(X,T,(0.6,0.2,0.2),shuffle=False,classification=True)
       X is nSamples x nFeatures.
       fractions can have just two values, for partitioning into train and test only
       If classification=True, T is target class as integer. Data partitioned
         according to class proportions.
-        """
-    # Skip the validation step
+    """
     validateFraction = 0
-    testFraction = 1 - trainFraction
+    if isinstance(percentages, (tuple, list)):
+        trainFraction = percentages[0]
+        testFraction = percentages[1]
+        if len(percentages) == 3:
+            validateFraction = percentages[2]
+
+    elif isinstance(percentages, float):
+        trainFraction = percentages
+        testFraction = 1 - trainFraction
+
+    else:
+        raise TypeError(
+            f'percentages {percentages} must be of the following (train, val, test) or 0.8 for train')
 
     rowIndices = np.arange(X.shape[0])
     if shuffle:
@@ -54,7 +65,7 @@ def partition(X, T, trainFraction, shuffle=False, classification=False):
         Ttrain = T[rowIndices[:nTrain], :]
         if nValidate > 0:
             Xvalidate = X[rowIndices[nTrain:nTrain+nValidate], :]
-            Tvalidate = T[rowIndices[nTrain:nTrain:nValidate], :]
+            Tvalidate = T[rowIndices[nTrain:nTrain+nValidate], :]
         Xtest = X[rowIndices[nTrain+nValidate:nTrain+nValidate+nTest], :]
         Ttest = T[rowIndices[nTrain+nValidate:nTrain+nValidate+nTest], :]
 

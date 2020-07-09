@@ -1,5 +1,0 @@
-PRESSURE_COLUMN_KEY = 'pressures_mb'
-TEMPERATURE_COLUMN_KEY = 'temperatures_deg_c'
-DEWPOINT_COLUMN_KEY = 'dewpoints_deg_c'
-WIND_SPEED_COLUMN_KEY = 'wind_speed_kt'
-WIND_DIR_COLUMN_KEY = 'wind_dir_deg'

@@ -130,9 +130,8 @@ def set_radiosonde_profile(sonde, t, dataset):
     # interpolate all values to sonde_profile_dims
     for i in range(dims):
         y = og_profile[:, i]
-        f = interpolate.interp1d(np.arange(len(y)), y, kind='linear')
-        profile[:, i] = f(np.linspace(
-            0, len(y) - 1, SONDE_CONFIG['sonde_profile_dims']))
+        profile[:, i] = interpolate_profile(
+            y, SONDE_CONFIG['sonde_profile_dims'])
 
     dataset.sonde_profile_P[t] = profile[:, 0]
     dataset.sonde_profile_T[t] = profile[:, 1]
@@ -211,6 +210,11 @@ def extract_all_information(root_path):
         del dataset
 
     print(f"runtime: {cpytime.time()-start_t}")
+
+
+def interpolate_profile(y, sonde_profile_dims=2000):
+    f = interpolate.interp1d(np.arange(len(y)), y, kind='linear')
+    return f(np.linspace(0, len(y) - 1, sonde_profile_dims))
 
 
 def set_configs(sonde_config, goes_config, rtma_config=None, nwp_config=None):

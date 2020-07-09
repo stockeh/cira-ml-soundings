@@ -10,7 +10,7 @@ import metpy.units
 import metpy.calc
 import numpy
 
-from soundings.utilities import radiosonde_utils
+from soundings.utils import radiosonde_utils
 
 # matplotlib.use('agg')
 

@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 
 from soundings.preprocessing import goesimager as goes16im
-from soundings.utilities import plotting_utils
+from soundings.utils import plotting_utils
 
 
 def plot_goes_region(D, projection='geos', extent=None):
