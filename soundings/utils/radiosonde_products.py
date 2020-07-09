@@ -33,33 +33,6 @@ def assert_dewpt_lte_temp(temperature, dewpoint):
     return all(dewpoint <= temperature)
 
 
-def _convert_units(sounding_dict):
-    """Convert pressure, temperature and dewpoint to MetPy units
-
-    :params
-    ---
-    sounding_dict : dict
-        Dictionary with the following keys.
-        radiosonde_utils.PRESSURE_COLUMN_KEY: numpy array of pressures (hPa).
-        radiosonde_utils.TEMPERATURE_COLUMN_KEY: numpy array of temperatures.
-        radiosonde_utils.DEWPOINT_COLUMN_KEY: numpy array of dewpoints.
-
-    :returns
-    ---
-    pressure : array
-    temperature : array
-    dewpoint : array
-    """
-    pressure = sounding_dict[radiosonde_utils.PRESSURE_COLUMN_KEY] * \
-        metpy.units.units.hPa
-    temperature = sounding_dict[radiosonde_utils.TEMPERATURE_COLUMN_KEY] * \
-        metpy.units.units.degC
-    dewpoint = sounding_dict[radiosonde_utils.DEWPOINT_COLUMN_KEY] * \
-        metpy.units.units.degC
-
-    return pressure, temperature, dewpoint
-
-
 def surface_based_cape_cin(sounding_dict):
     """Calculate surface-based CAPE and CIN.
 
@@ -78,7 +51,8 @@ def surface_based_cape_cin(sounding_dict):
     cin : float
         Surface based Convective Inhibition (CIN).
     """
-    pressure, temperature, dewpoint = _convert_units(sounding_dict)
+    pressure, temperature, dewpoint = radiosonde_utils.convert_units(
+        sounding_dict)
 
     cape, cin = metpy.calc.thermo.surface_based_cape_cin(
         pressure, temperature, dewpoint)
@@ -104,7 +78,8 @@ def most_unstable_cape_cin(sounding_dict):
     cin : float
         Surface based Convective Inhibition (CIN).
     """
-    pressure, temperature, dewpoint = _convert_units(sounding_dict)
+    pressure, temperature, dewpoint = radiosonde_utils.convert_units(
+        sounding_dict)
 
     cape, cin = metpy.calc.thermo.most_unstable_cape_cin(
         pressure, temperature, dewpoint)
@@ -113,7 +88,8 @@ def most_unstable_cape_cin(sounding_dict):
 
 
 def el(sounding_dict):
-    pressure, temperature, dewpoint = _convert_units(sounding_dict)
+    pressure, temperature, dewpoint = radiosonde_utils.convert_units(
+        sounding_dict)
 
     el_pressure, el_temperature = metpy.calc.thermo.el(
         pressure, temperature, dewpoint)

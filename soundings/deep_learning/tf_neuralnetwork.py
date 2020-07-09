@@ -138,7 +138,7 @@ class ConvolutionalNeuralNetwork(NeuralNetwork):
     def __init__(self, n_inputs, n_units_in_conv_layers,
                  kernels_size_and_stride, n_outputs, activation='relu'):
 
-        if not isinstance(n_units_in_conv_layers, list):
+        if not isinstance(n_units_in_conv_layers, (list, tuple)):
             raise Exception(
                 f'{type(self).__name__}: n_units_in_conv_layers must be a list.')
 
@@ -157,10 +157,62 @@ class ConvolutionalNeuralNetwork(NeuralNetwork):
         Z = X
         for (kernel, stride), units in zip(kernels_size_and_stride, n_units_in_conv_layers):
             Z = tf.keras.layers.Conv1D(
-                units, kernel_size=kernel, strides=stride,  activation=activation)(Z)
-            Z = tf.keras.layers.MaxPooling1D(2)(Z)
+                units, kernel_size=kernel, strides=stride,  activation=activation, padding='same')(Z)
+            Z = tf.keras.layers.MaxPooling1D(pool_size=2)(Z)
         Y = tf.keras.layers.Dense(n_outputs)(tf.keras.layers.Flatten()(Z))
 
+        self.model = tf.keras.Model(inputs=X, outputs=Y)
+
+        self.Xmeans = None
+        self.Xstds = None
+        self.Tmeans = None
+        self.Tstds = None
+
+        self.history = None
+        self.training_time = None
+
+    def __repr__(self):
+        str = f'{type(self).__name__}({self.n_inputs}, {self.n_units_in_conv_layers}, {self.kernels_size_and_stride}, {self.n_outputs})'
+        if self.history:
+            str += f"\n  Final objective value is {self.history['loss'][-1]:.5f} in {self.training_time:.4f} seconds."
+        else:
+            str += '  Network is not trained.'
+        return str
+
+
+class ConvolutionalAutoEncoder(NeuralNetwork):
+    def __init__(self, n_inputs, n_units_in_conv_layers,
+                 kernels_size_and_stride, n_outputs, activation='relu'):
+
+        if not isinstance(n_units_in_conv_layers, (list, tuple)):
+            raise Exception(
+                f'{type(self).__name__}: n_units_in_conv_layers must be a list.')
+
+        if not isinstance(kernels_size_and_stride, list):
+            raise Exception(
+                f'{type(self).__name__}: kernels_size_and_stride must be a list.')
+
+        tf.keras.backend.clear_session()
+
+        self.n_inputs = n_inputs
+        self.n_units_in_conv_layers = n_units_in_conv_layers
+        self.kernels_size_and_stride = kernels_size_and_stride
+        self.n_outputs = n_outputs
+
+        X = tf.keras.Input(shape=n_inputs)
+        Z = X
+        for (kernel, stride), units in zip(kernels_size_and_stride, n_units_in_conv_layers):
+            Z = tf.keras.layers.Conv1D(
+                units, kernel_size=kernel, strides=stride,  activation=activation, padding='same')(Z)
+            Z = tf.keras.layers.MaxPooling1D(pool_size=2)(Z)
+
+        for (kernel, stride), units in zip(reversed(kernels_size_and_stride), reversed(n_units_in_conv_layers)):
+            Z = tf.keras.layers.Conv1D(
+                units, kernel_size=kernel, strides=stride,  activation=activation, padding='same')(Z)
+            Z = tf.keras.layers.UpSampling1D(size=2)(Z)
+        Z = tf.keras.layers.Conv1D(
+            1, kernel_size=3, strides=1,  activation='sigmoid', padding='same')(Z)
+        Y = tf.keras.layers.Flatten()(Z)
         self.model = tf.keras.Model(inputs=X, outputs=Y)
 
         self.Xmeans = None
