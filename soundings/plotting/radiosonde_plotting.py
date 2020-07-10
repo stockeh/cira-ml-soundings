@@ -112,6 +112,8 @@ def _plot_attributes(skewt_object, option_dict, font_size, title_string):
         '{0:d}'.format(int(numpy.round(y))) for y in axes_object.get_yticks()
     ]
     axes_object.set_yticklabels(y_tick_labels, fontsize=font_size)
+    # TODO: Shouldn't need this hack...
+    axes_object.set_xlim(-40, 50)
 
     if title_string is not None:
         pyplot.title(title_string, fontsize=font_size)
@@ -211,7 +213,7 @@ def plot_predicted_sounding(sounding_dict, font_size=DEFAULT_FONT_SIZE,
     option_dict.update(orig_option_dict)
 
     predicted_line_colour = option_dict[PREDICTED_LINE_COLOUR_KEY]
-    main_line_width = option_dict[MAIN_LINE_WIDTH_KEY] / 2.0
+    main_line_width = option_dict[MAIN_LINE_WIDTH_KEY] / 1.75
 
     figure_object, skewt_object = plot_sounding(
         sounding_dict, font_size, title_string, option_dict)
