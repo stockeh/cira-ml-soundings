@@ -198,8 +198,8 @@ def plot_sounding(
     _plot_attributes(skewt_object, option_dict, font_size, title_string)
 
     # pyplot.savefig('sgp-22', dpi=DOTS_PER_INCH)
-    pyplot.show()
-    pyplot.close()
+    # pyplot.show()
+    # pyplot.close()
 
     return figure_object, skewt_object
 
@@ -233,7 +233,7 @@ def plot_predicted_sounding(sounding_dict, font_size=DEFAULT_FONT_SIZE,
     pyplot.legend(('T', 'Y'), fontsize=font_size)
 
     # pyplot.savefig('sgp-prediction', dpi=DOTS_PER_INCH)
-    pyplot.show()
-    pyplot.close()
+    # pyplot.show()
+    # pyplot.close()
 
     return figure_object, skewt_object
