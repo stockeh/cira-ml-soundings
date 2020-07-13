@@ -37,12 +37,12 @@ DEFAULT_OPTION_DICT = {
     CONTOUR_LINE_WIDTH_KEY: 1,
     GRID_LINE_COLOUR_KEY: numpy.array([152, 152, 152], dtype=float) / 255,
     GRID_LINE_WIDTH_KEY: 2,
-    FIGURE_WIDTH_KEY: 15,  # 15,
-    FIGURE_HEIGHT_KEY: 15  # 15
+    FIGURE_WIDTH_KEY: 8,  # 15,
+    FIGURE_HEIGHT_KEY: 8  # 15
 }
 
-DEFAULT_FONT_SIZE = 30  # 30
-TITLE_FONT_SIZE = 25  # 25
+DEFAULT_FONT_SIZE = 15  # 30
+TITLE_FONT_SIZE = 10  # 25
 
 DOTS_PER_INCH = 300
 
@@ -198,7 +198,8 @@ def plot_sounding(
     _plot_attributes(skewt_object, option_dict, font_size, title_string)
 
     # pyplot.savefig('sgp-22', dpi=DOTS_PER_INCH)
-    # pyplot.close()
+    pyplot.show()
+    pyplot.close()
 
     return figure_object, skewt_object
 
@@ -232,6 +233,7 @@ def plot_predicted_sounding(sounding_dict, font_size=DEFAULT_FONT_SIZE,
     pyplot.legend(('T', 'Y'), fontsize=font_size)
 
     # pyplot.savefig('sgp-prediction', dpi=DOTS_PER_INCH)
-    # pyplot.close()
+    pyplot.show()
+    pyplot.close()
 
     return figure_object, skewt_object

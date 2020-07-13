@@ -198,7 +198,8 @@ class ConvolutionalAutoEncoder(NeuralNetwork):
         self.n_units_in_conv_layers = n_units_in_conv_layers
         self.kernels_size_and_stride = kernels_size_and_stride
         self.n_outputs = n_outputs
-
+        self.n_hidden_dim = 100
+                  
         X = tf.keras.Input(shape=n_inputs)
         Z = X
         for (kernel, stride), units in zip(kernels_size_and_stride, n_units_in_conv_layers):
@@ -206,6 +207,13 @@ class ConvolutionalAutoEncoder(NeuralNetwork):
                 units, kernel_size=kernel, strides=stride,  activation=activation, padding='same')(Z)
             Z = tf.keras.layers.MaxPooling1D(pool_size=2)(Z)
 
+        conv_shape = Z.shape[1:]
+        F = tf.keras.layers.Flatten()(Z)
+        Z = tf.keras.layers.Dense(self.n_hidden_dim)(F)
+        print(F.shape[1])
+        Z = tf.keras.layers.Dense(F.shape[1])(Z)        
+        Z = tf.keras.layers.Reshape(conv_shape)(Z)
+                  
         for (kernel, stride), units in zip(reversed(kernels_size_and_stride), reversed(n_units_in_conv_layers)):
             Z = tf.keras.layers.Conv1D(
                 units, kernel_size=kernel, strides=stride,  activation=activation, padding='same')(Z)
