@@ -10,6 +10,8 @@ from soundings.utils import radiosonde_utils
 2) temperature does not decrease faster than the adiabatic lapse rate (g/cp) above 10 m, 
 3) At the tropopause the temperature is nearly constant with height. 
 
+4) z(0) - z(10m) super adiabatic lapse rate, the lower levels are hard to capture with NWP
+
 Additionally, two derived parameters will be included: 
 
 1) the convective inhibition (CIN), and 

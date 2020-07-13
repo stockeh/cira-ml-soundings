@@ -37,20 +37,12 @@ DEFAULT_OPTION_DICT = {
     CONTOUR_LINE_WIDTH_KEY: 1,
     GRID_LINE_COLOUR_KEY: numpy.array([152, 152, 152], dtype=float) / 255,
     GRID_LINE_WIDTH_KEY: 2,
-    FIGURE_WIDTH_KEY: 8,  # 15,
-    FIGURE_HEIGHT_KEY: 8  # 15
+    FIGURE_WIDTH_KEY: 15,  # 15,
+    FIGURE_HEIGHT_KEY: 15  # 15
 }
 
-DEFAULT_FONT_SIZE = 12  # 30
-TITLE_FONT_SIZE = 12  # 25
-
-# pyplot.rc('font', size=DEFAULT_FONT_SIZE)
-# pyplot.rc('axes', titlesize=DEFAULT_FONT_SIZE)
-# pyplot.rc('axes', labelsize=DEFAULT_FONT_SIZE)
-# pyplot.rc('xtick', labelsize=DEFAULT_FONT_SIZE)
-# pyplot.rc('ytick', labelsize=DEFAULT_FONT_SIZE)
-# pyplot.rc('legend', fontsize=DEFAULT_FONT_SIZE)
-# pyplot.rc('figure', titlesize=DEFAULT_FONT_SIZE)
+DEFAULT_FONT_SIZE = 30  # 30
+TITLE_FONT_SIZE = 25  # 25
 
 DOTS_PER_INCH = 300
 
@@ -120,6 +112,15 @@ def _plot_attributes(skewt_object, option_dict, font_size, title_string):
 
 
 def _init_skewT(option_dict):
+
+    pyplot.rc('font', size=DEFAULT_FONT_SIZE)
+    pyplot.rc('axes', titlesize=DEFAULT_FONT_SIZE)
+    pyplot.rc('axes', labelsize=DEFAULT_FONT_SIZE)
+    pyplot.rc('xtick', labelsize=DEFAULT_FONT_SIZE)
+    pyplot.rc('ytick', labelsize=DEFAULT_FONT_SIZE)
+    pyplot.rc('legend', fontsize=DEFAULT_FONT_SIZE)
+    pyplot.rc('figure', titlesize=DEFAULT_FONT_SIZE)
+
     figure_width_inches = option_dict[FIGURE_WIDTH_KEY]
     figure_height_inches = option_dict[FIGURE_HEIGHT_KEY]
 
@@ -196,7 +197,7 @@ def plot_sounding(
 
     _plot_attributes(skewt_object, option_dict, font_size, title_string)
 
-    # pyplot.savefig('OKAY', dpi=DOTS_PER_INCH)
+    # pyplot.savefig('sgp-22', dpi=DOTS_PER_INCH)
     # pyplot.close()
 
     return figure_object, skewt_object
@@ -229,5 +230,8 @@ def plot_predicted_sounding(sounding_dict, font_size=DEFAULT_FONT_SIZE,
     )
 
     pyplot.legend(('T', 'Y'), fontsize=font_size)
+
+    # pyplot.savefig('sgp-prediction', dpi=DOTS_PER_INCH)
+    # pyplot.close()
 
     return figure_object, skewt_object
