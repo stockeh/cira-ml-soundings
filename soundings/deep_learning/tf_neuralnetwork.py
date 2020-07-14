@@ -91,7 +91,7 @@ class NeuralNetwork():
         return self.Tstds * Ts + self.Tmeans
 
     def train(self, X, T, n_epochs, batch_size, method='scg',
-              verbose=False, learning_rate=0.001, validation=None):
+              verbose=False, learning_rate=0.001, validation=None, loss_f=None):
         """Use Keras Functional API to train model"""
 
         self._setup_standardize(X, T)
@@ -113,8 +113,8 @@ class NeuralNetwork():
             raise Exception(
                 "train: method={method} not one of 'scg' or 'adam'")
 
-        self.model.compile(optimizer=algo(learning_rate),
-                           loss=tf.keras.losses.MSE,
+        loss = tf.keras.losses.MSE if loss_f == None else loss_f
+        self.model.compile(optimizer=algo(learning_rate), loss=loss,
                            metrics=[tf.keras.metrics.RootMeanSquaredError()])
 
         # log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -182,7 +182,7 @@ class ConvolutionalNeuralNetwork(NeuralNetwork):
 
 class ConvolutionalAutoEncoder(NeuralNetwork):
     def __init__(self, n_inputs, n_units_in_conv_layers,
-                 kernels_size_and_stride, n_outputs, activation='relu'):
+                 kernels_size_and_stride, n_outputs, activation='relu', n_hidden_dims=100):
 
         if not isinstance(n_units_in_conv_layers, (list, tuple)):
             raise Exception(
@@ -198,8 +198,9 @@ class ConvolutionalAutoEncoder(NeuralNetwork):
         self.n_units_in_conv_layers = n_units_in_conv_layers
         self.kernels_size_and_stride = kernels_size_and_stride
         self.n_outputs = n_outputs
-        self.n_hidden_dim = 100
+        self.n_hidden_dim = n_hidden_dims
                   
+        # encoder      
         X = tf.keras.Input(shape=n_inputs)
         Z = X
         for (kernel, stride), units in zip(kernels_size_and_stride, n_units_in_conv_layers):
@@ -207,11 +208,13 @@ class ConvolutionalAutoEncoder(NeuralNetwork):
                 units, kernel_size=kernel, strides=stride,  activation=activation, padding='same')(Z)
             Z = tf.keras.layers.MaxPooling1D(pool_size=2)(Z)
 
+        # latent vector
         conv_shape = Z.shape[1:]
         F = tf.keras.layers.Flatten()(Z)
-        Z = tf.keras.layers.Dense(self.n_hidden_dim)(F)
-        print(F.shape[1])
-        Z = tf.keras.layers.Dense(F.shape[1])(Z)        
+        Z = tf.keras.layers.Dense(n_hidden_dims, activation='tanh')(F)
+                  
+        # decoder (input of `n_hidden_dim`)
+        Z = tf.keras.layers.Dense(F.shape[1], activation='tanh')(Z)        
         Z = tf.keras.layers.Reshape(conv_shape)(Z)
                   
         for (kernel, stride), units in zip(reversed(kernels_size_and_stride), reversed(n_units_in_conv_layers)):
@@ -219,7 +222,7 @@ class ConvolutionalAutoEncoder(NeuralNetwork):
                 units, kernel_size=kernel, strides=stride,  activation=activation, padding='same')(Z)
             Z = tf.keras.layers.UpSampling1D(size=2)(Z)
         Z = tf.keras.layers.Conv1D(
-            1, kernel_size=3, strides=1,  activation='sigmoid', padding='same')(Z)
+            1, kernel_size=10, strides=1, activation='sigmoid', padding='same')(Z)
         Y = tf.keras.layers.Flatten()(Z)
         self.model = tf.keras.Model(inputs=X, outputs=Y)
 
