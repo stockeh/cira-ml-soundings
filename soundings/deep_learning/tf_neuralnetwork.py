@@ -5,6 +5,10 @@ import time
 import numpy as np
 import tensorflow as tf
 
+from tensorflow.python.framework import ops
+from tensorflow.python.keras import backend as K
+from tensorflow.python.ops import math_ops
+
 
 class TrainLogger(tf.keras.callbacks.Callback):
 
@@ -118,8 +122,8 @@ class NeuralNetwork():
                            metrics=[tf.keras.metrics.RootMeanSquaredError()])
 
         # log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-        callback = [TrainLogger(n_epochs, step=5), tf.keras.callbacks.TensorBoard(
-            histogram_freq=1)] if verbose else None  # log_dir=log_dir,
+        # , tf.keras.callbacks.TensorBoard(histogram_freq=1)
+        callback = [TrainLogger(n_epochs, step=5)] if verbose else None
 
         start_time = time.time()
         self.history = self.model.fit(X, T, batch_size=batch_size, epochs=n_epochs,
@@ -199,8 +203,8 @@ class ConvolutionalAutoEncoder(NeuralNetwork):
         self.kernels_size_and_stride = kernels_size_and_stride
         self.n_outputs = n_outputs
         self.n_hidden_dim = n_hidden_dims
-                  
-        # encoder      
+
+        # encoder
         X = tf.keras.Input(shape=n_inputs)
         Z = X
         for (kernel, stride), units in zip(kernels_size_and_stride, n_units_in_conv_layers):
@@ -212,17 +216,17 @@ class ConvolutionalAutoEncoder(NeuralNetwork):
         conv_shape = Z.shape[1:]
         F = tf.keras.layers.Flatten()(Z)
         Z = tf.keras.layers.Dense(n_hidden_dims, activation='tanh')(F)
-                  
+
         # decoder (input of `n_hidden_dim`)
-        Z = tf.keras.layers.Dense(F.shape[1], activation='tanh')(Z)        
+        Z = tf.keras.layers.Dense(F.shape[1], activation='tanh')(Z)
         Z = tf.keras.layers.Reshape(conv_shape)(Z)
-                  
+
         for (kernel, stride), units in zip(reversed(kernels_size_and_stride), reversed(n_units_in_conv_layers)):
             Z = tf.keras.layers.Conv1D(
                 units, kernel_size=kernel, strides=stride,  activation=activation, padding='same')(Z)
             Z = tf.keras.layers.UpSampling1D(size=2)(Z)
         Z = tf.keras.layers.Conv1D(
-            1, kernel_size=10, strides=1, activation='sigmoid', padding='same')(Z)
+            1, kernel_size=10, strides=1, padding='same')(Z)
         Y = tf.keras.layers.Flatten()(Z)
         self.model = tf.keras.Model(inputs=X, outputs=Y)
 
@@ -241,3 +245,15 @@ class ConvolutionalAutoEncoder(NeuralNetwork):
         else:
             str += '  Network is not trained.'
         return str
+
+
+def weighted_mean_squared_error(y_true, y_pred):
+    y_pred = ops.convert_to_tensor_v2(y_pred)
+    y_true = math_ops.cast(y_true, y_pred.dtype)
+    diff = math_ops.squared_difference(y_pred, y_true)
+
+    x = np.arange(diff.shape[1])
+    def y(x): return .2 * np.exp(-.005 * x) + 1
+    diff *= y(x)
+
+    return K.mean(diff, axis=-1)
