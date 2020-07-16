@@ -1,6 +1,7 @@
 import copy
 import datetime
 import time
+import random
 
 import numpy as np
 import tensorflow as tf
@@ -25,12 +26,18 @@ class TrainLogger(tf.keras.callbacks.Callback):
 
 
 class NeuralNetwork():
-    def __init__(self, n_inputs, n_hiddens_list, n_outputs, activation='tanh'):
+    def __init__(self, n_inputs, n_hiddens_list, n_outputs, activation='tanh', seed=None):
 
         if not isinstance(n_hiddens_list, list):
             raise Exception(
                 f'{type(self).__name__}: n_hiddens_list must be a list.')
 
+        if seed:
+            self.seed = seed
+            np.random.seed(seed)
+            random.seed(seed)
+            tf.random.set_seed(seed)
+                  
         tf.keras.backend.clear_session()
 
         self.n_inputs = n_inputs
@@ -140,7 +147,7 @@ class NeuralNetwork():
 
 class ConvolutionalNeuralNetwork(NeuralNetwork):
     def __init__(self, n_inputs, n_units_in_conv_layers,
-                 kernels_size_and_stride, n_outputs, activation='relu'):
+                 kernels_size_and_stride, n_outputs, activation='relu', seed=None):
 
         if not isinstance(n_units_in_conv_layers, (list, tuple)):
             raise Exception(
@@ -150,6 +157,12 @@ class ConvolutionalNeuralNetwork(NeuralNetwork):
             raise Exception(
                 f'{type(self).__name__}: kernels_size_and_stride must be a list.')
 
+        if seed:
+            self.seed = seed
+            np.random.seed(seed)
+            random.seed(seed)
+            tf.random.set_seed(seed)
+                  
         tf.keras.backend.clear_session()
 
         self.n_inputs = n_inputs
@@ -186,7 +199,7 @@ class ConvolutionalNeuralNetwork(NeuralNetwork):
 
 class ConvolutionalAutoEncoder(NeuralNetwork):
     def __init__(self, n_inputs, n_units_in_conv_layers,
-                 kernels_size_and_stride, n_outputs, activation='relu', n_hidden_dims=100):
+                 kernels_size_and_stride, n_outputs, activation='relu', n_hidden_dims=100, seed=None):
 
         if not isinstance(n_units_in_conv_layers, (list, tuple)):
             raise Exception(
@@ -196,6 +209,12 @@ class ConvolutionalAutoEncoder(NeuralNetwork):
             raise Exception(
                 f'{type(self).__name__}: kernels_size_and_stride must be a list.')
 
+        if seed:
+            self.seed = seed
+            np.random.seed(seed)
+            random.seed(seed)
+            tf.random.set_seed(seed)
+                  
         tf.keras.backend.clear_session()
 
         self.n_inputs = n_inputs
@@ -207,6 +226,9 @@ class ConvolutionalAutoEncoder(NeuralNetwork):
         # encoder
         X = tf.keras.Input(shape=n_inputs)
         Z = X
+        # used when input size is 4 splits @ 500          
+        # Z = tf.keras.layers.ZeroPadding1D(padding=6)(Z)
+        ######################################## 
         for (kernel, stride), units in zip(kernels_size_and_stride, n_units_in_conv_layers):
             Z = tf.keras.layers.Conv1D(
                 units, kernel_size=kernel, strides=stride,  activation=activation, padding='same')(Z)
@@ -227,6 +249,9 @@ class ConvolutionalAutoEncoder(NeuralNetwork):
             Z = tf.keras.layers.UpSampling1D(size=2)(Z)
         Z = tf.keras.layers.Conv1D(
             1, kernel_size=10, strides=1, padding='same')(Z)
+        # used when input size is 4 splits @ 500
+        # Z = tf.keras.layers.Cropping1D(cropping=6)(Z)
+        ########################################          
         Y = tf.keras.layers.Flatten()(Z)
         self.model = tf.keras.Model(inputs=X, outputs=Y)
 
