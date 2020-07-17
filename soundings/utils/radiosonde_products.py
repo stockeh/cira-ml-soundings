@@ -53,7 +53,7 @@ def surface_based_cape_cin(sounding_dict):
     cin : float
         Surface based Convective Inhibition (CIN).
     """
-    pressure, temperature, dewpoint = radiosonde_utils.convert_units(
+    pressure, temperature, dewpoint = radiosonde_utils.convert_metpy_profile(
         sounding_dict)
 
     cape, cin = metpy.calc.thermo.surface_based_cape_cin(
@@ -80,7 +80,7 @@ def most_unstable_cape_cin(sounding_dict):
     cin : float
         Surface based Convective Inhibition (CIN).
     """
-    pressure, temperature, dewpoint = radiosonde_utils.convert_units(
+    pressure, temperature, dewpoint = radiosonde_utils.convert_metpy_profile(
         sounding_dict)
 
     cape, cin = metpy.calc.thermo.most_unstable_cape_cin(
@@ -90,7 +90,7 @@ def most_unstable_cape_cin(sounding_dict):
 
 
 def el(sounding_dict):
-    pressure, temperature, dewpoint = radiosonde_utils.convert_units(
+    pressure, temperature, dewpoint = radiosonde_utils.convert_metpy_profile(
         sounding_dict)
 
     el_pressure, el_temperature = metpy.calc.thermo.el(
