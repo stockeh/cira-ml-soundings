@@ -26,6 +26,9 @@ GRID_LINE_COLOUR_KEY = 'grid_line_colour'
 GRID_LINE_WIDTH_KEY = 'grid_line_width'
 FIGURE_WIDTH_KEY = 'figure_width_inches'
 FIGURE_HEIGHT_KEY = 'figure_height_inches'
+DEFAULT_FONT_SIZE = 'default_font_size'
+TITLE_FONT_SIZE = 'title_font_size'
+DOTS_PER_INCH = 'dots_per_inch'
 
 DEFAULT_OPTION_DICT = {
     MAIN_LINE_COLOUR_KEY: numpy.array([0, 0, 0], dtype=float),
@@ -37,18 +40,19 @@ DEFAULT_OPTION_DICT = {
     CONTOUR_LINE_WIDTH_KEY: 1,
     GRID_LINE_COLOUR_KEY: numpy.array([152, 152, 152], dtype=float) / 255,
     GRID_LINE_WIDTH_KEY: 2,
-    FIGURE_WIDTH_KEY: 8,  # 15,
-    FIGURE_HEIGHT_KEY: 8  # 15
-#     FIGURE_WIDTH_KEY: 15,  # 15,
-#     FIGURE_HEIGHT_KEY: 15  # 15
+    FIGURE_WIDTH_KEY: 8,
+    FIGURE_HEIGHT_KEY: 8,
+    DEFAULT_FONT_SIZE: 12,
+    TITLE_FONT_SIZE: 10,
+    DOTS_PER_INCH: 300
 }
 
-DEFAULT_FONT_SIZE = 12  # 30
-TITLE_FONT_SIZE = 10  # 25
-# DEFAULT_FONT_SIZE = 30  # 30
-# TITLE_FONT_SIZE = 25  # 25
-DOTS_PER_INCH = 300
 
+def _init_save_img(option_dict):    
+    option_dict[DEFAULT_FONT_SIZE] = 30
+    option_dict[TITLE_FONT_SIZE] = 25
+    option_dict[FIGURE_WIDTH_KEY] = 15
+    option_dict[FIGURE_HEIGHT_KEY] = 15
 
 def colour_from_numpy_to_tuple(input_colour):
     """Converts colour from numpy array to tuple (if necessary).
@@ -62,7 +66,8 @@ def colour_from_numpy_to_tuple(input_colour):
     return tuple(input_colour.tolist())
 
 
-def _plot_attributes(skewt_object, option_dict, font_size, title_string):
+def _plot_attributes(skewt_object, option_dict, title_string):
+    
     dry_adiabat_colour = option_dict[DRY_ADIABAT_COLOUR_KEY]
     moist_adiabat_colour = option_dict[MOIST_ADIABAT_COLOUR_KEY]
     isohume_colour = option_dict[ISOHUME_COLOUR_KEY]
@@ -101,28 +106,28 @@ def _plot_attributes(skewt_object, option_dict, font_size, title_string):
     x_tick_labels = [
         '{0:d}'.format(int(numpy.round(x))) for x in axes_object.get_xticks()
     ]
-    axes_object.set_xticklabels(x_tick_labels, fontsize=font_size)
+    axes_object.set_xticklabels(x_tick_labels, fontsize=option_dict[DEFAULT_FONT_SIZE])
 
     y_tick_labels = [
         '{0:d}'.format(int(numpy.round(y))) for y in axes_object.get_yticks()
     ]
-    axes_object.set_yticklabels(y_tick_labels, fontsize=font_size)
+    axes_object.set_yticklabels(y_tick_labels, fontsize=option_dict[DEFAULT_FONT_SIZE])
     # TODO: Shouldn't need this hack...
     axes_object.set_xlim(-40, 50)
 
     if title_string is not None:
-        pyplot.title(title_string, fontsize=font_size)
+        pyplot.title(title_string, fontsize=option_dict[TITLE_FONT_SIZE])
 
 
 def _init_skewT(option_dict):
 
-    pyplot.rc('font', size=DEFAULT_FONT_SIZE)
-    pyplot.rc('axes', titlesize=DEFAULT_FONT_SIZE)
-    pyplot.rc('axes', labelsize=DEFAULT_FONT_SIZE)
-    pyplot.rc('xtick', labelsize=DEFAULT_FONT_SIZE)
-    pyplot.rc('ytick', labelsize=DEFAULT_FONT_SIZE)
-    pyplot.rc('legend', fontsize=DEFAULT_FONT_SIZE)
-    pyplot.rc('figure', titlesize=DEFAULT_FONT_SIZE)
+    pyplot.rc('font', size=option_dict[DEFAULT_FONT_SIZE])
+    pyplot.rc('axes', titlesize=option_dict[DEFAULT_FONT_SIZE])
+    pyplot.rc('axes', labelsize=option_dict[DEFAULT_FONT_SIZE])
+    pyplot.rc('xtick', labelsize=option_dict[DEFAULT_FONT_SIZE])
+    pyplot.rc('ytick', labelsize=option_dict[DEFAULT_FONT_SIZE])
+    pyplot.rc('legend', fontsize=option_dict[DEFAULT_FONT_SIZE])
+    pyplot.rc('figure', titlesize=option_dict[DEFAULT_FONT_SIZE])
 
     figure_width_inches = option_dict[FIGURE_WIDTH_KEY]
     figure_height_inches = option_dict[FIGURE_HEIGHT_KEY]
@@ -135,9 +140,7 @@ def _init_skewT(option_dict):
     return figure_object, skewt_object
 
 
-def plot_sounding(
-        sounding_dict, font_size=DEFAULT_FONT_SIZE, title_string=None,
-        option_dict=None):
+def plot_sounding(sounding_dict, title_string=None, option_dict=None, file_name=None):
     """Plots atmospheric sounding.
 
     H = number of vertical levels in sounding
@@ -146,24 +149,26 @@ def plot_sounding(
         sounding_dict : dict
             The following keys: pressures_mb, temperatures_deg_c, dewpoints_deg_c
             wind_speed_kt, wind_dir_deg
-        font_size : int
         title_string : str
         option_dict : dict
-
+        file_name : str
+            Default `None` does not save profile to disk
     :return
     ---
         figure_object : Figure handle
         skewt_object : SkewT handle (skewt_object.ax)
     """
     if option_dict is None:
-        orig_option_dict = {}
+        option_dict = {}
+        orig_option_dict = DEFAULT_OPTION_DICT.copy()
     else:
         orig_option_dict = option_dict.copy()
 
-    option_dict = DEFAULT_OPTION_DICT.copy()
     option_dict.update(orig_option_dict)
 
-    main_line_colour = option_dict[MAIN_LINE_COLOUR_KEY]
+    if file_name:
+        _init_save_img(option_dict)
+     
     main_line_width = option_dict[MAIN_LINE_WIDTH_KEY]
 
     figure_object, skewt_object = _init_skewT(option_dict)
@@ -173,7 +178,7 @@ def plot_sounding(
         temperature = radiosonde_utils.convert_metpy_temperature(sounding_dict)
         skewt_object.plot(
             pressure, temperature,
-            color=colour_from_numpy_to_tuple(main_line_colour),
+            color=colour_from_numpy_to_tuple(option_dict[MAIN_LINE_COLOUR_KEY]),
             linewidth=main_line_width, linestyle='solid'
         )
     except KeyError:
@@ -183,8 +188,8 @@ def plot_sounding(
         dewpoint = radiosonde_utils.convert_metpy_dewpoint(sounding_dict)
         skewt_object.plot(
             pressure, dewpoint,
-            color=colour_from_numpy_to_tuple(main_line_colour),
-            linewidth=main_line_width, linestyle='dashed'
+            color=colour_from_numpy_to_tuple(option_dict[PREDICTED_LINE_COLOUR_KEY]),
+            linewidth=main_line_width, linestyle='solid'
         )
     except KeyError:
         pass
@@ -198,30 +203,50 @@ def plot_sounding(
     except KeyError:
         pass
 
-    _plot_attributes(skewt_object, option_dict, font_size, title_string)
+    _plot_attributes(skewt_object, option_dict, title_string)
 
-    # pyplot.savefig('sgp-22', dpi=DOTS_PER_INCH)
-    # pyplot.show()
-    # pyplot.close()
+    if file_name:
+        pyplot.savefig(file_name, dpi=option_dict[DOTS_PER_INCH])
+        pyplot.show()
+        pyplot.close()
 
     return figure_object, skewt_object
 
 
-def plot_predicted_sounding(sounding_dict, font_size=DEFAULT_FONT_SIZE,
-                            title_string=None, option_dict=None):
+def plot_predicted_sounding(sounding_dict, title_string=None, option_dict=None, file_name=None):
+    """Plots atmospheric sounding ground truth and prediction.
+
+    H = number of vertical levels in sounding
+    :params
+    ---
+        sounding_dict : dict
+            The following keys: pressures_mb, temperatures_deg_c, dewpoints_deg_c
+            wind_speed_kt, wind_dir_deg
+        title_string : str
+        option_dict : dict
+        file_name : str
+            Default `None` does not save profile to disk
+    :return
+    ---
+        figure_object : Figure handle
+        skewt_object : SkewT handle (skewt_object.ax)
+    """
     if option_dict is None:
-        orig_option_dict = {}
+        option_dict = {}
+        orig_option_dict = DEFAULT_OPTION_DICT.copy()
     else:
         orig_option_dict = option_dict.copy()
 
-    option_dict = DEFAULT_OPTION_DICT.copy()
     option_dict.update(orig_option_dict)
 
+    if file_name:
+        _init_save_img(option_dict)
+    
     predicted_line_colour = option_dict[PREDICTED_LINE_COLOUR_KEY]
     main_line_width = option_dict[MAIN_LINE_WIDTH_KEY] / 1.75
 
     figure_object, skewt_object = plot_sounding(
-        sounding_dict, font_size, title_string, option_dict)
+        sounding_dict, title_string, option_dict)
 
     pressure = radiosonde_utils.convert_metpy_pressure(sounding_dict)
     predicted_temperatures_deg_c = sounding_dict[radiosonde_utils.PREDICTED_TEMPERATURE_COLUMN_KEY] * \
@@ -233,10 +258,11 @@ def plot_predicted_sounding(sounding_dict, font_size=DEFAULT_FONT_SIZE,
         linewidth=main_line_width, linestyle='solid'
     )
 
-    pyplot.legend(('T', 'Y'), fontsize=font_size)
-
-#     pyplot.savefig('sgp-prediction', dpi=DOTS_PER_INCH)
-#     pyplot.show()
-#     pyplot.close()
+    pyplot.legend(('T', 'Y'), fontsize=option_dict[DEFAULT_FONT_SIZE])
+    
+    if file_name:
+        pyplot.savefig(file_name, dpi=option_dict[DOTS_PER_INCH])
+        pyplot.show()
+        pyplot.close()
 
     return figure_object, skewt_object

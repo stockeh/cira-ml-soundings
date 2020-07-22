@@ -98,11 +98,13 @@ def partition(X, T, percentages, shuffle=False, classification=False):
             Tvalidate = T[validateIndices, :]
         Xtest = X[testIndices, :]
         Ttest = T[testIndices, :]
+
     if nValidate > 0:
         return Xtrain, Ttrain, Xvalidate, Tvalidate, Xtest, Ttest
     else:
         return Xtrain, Ttrain, Xtest, Ttest
-
+        
+        
 ######################################################################
 
 
