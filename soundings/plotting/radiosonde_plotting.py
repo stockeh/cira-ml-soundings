@@ -43,7 +43,7 @@ DEFAULT_OPTION_DICT = {
     FIGURE_WIDTH_KEY: 8,
     FIGURE_HEIGHT_KEY: 8,
     DEFAULT_FONT_SIZE: 12,
-    TITLE_FONT_SIZE: 10,
+    TITLE_FONT_SIZE: 12,
     DOTS_PER_INCH: 300
 }
 
@@ -106,34 +106,31 @@ def _plot_attributes(skewt_object, option_dict, title_string):
     x_tick_labels = [
         '{0:d}'.format(int(numpy.round(x))) for x in axes_object.get_xticks()
     ]
-    axes_object.set_xticklabels(x_tick_labels, fontsize=option_dict[DEFAULT_FONT_SIZE])
+    axes_object.set_xticklabels(x_tick_labels)
 
     y_tick_labels = [
         '{0:d}'.format(int(numpy.round(y))) for y in axes_object.get_yticks()
     ]
-    axes_object.set_yticklabels(y_tick_labels, fontsize=option_dict[DEFAULT_FONT_SIZE])
+    axes_object.set_yticklabels(y_tick_labels)
     # TODO: Shouldn't need this hack...
     axes_object.set_xlim(-40, 50)
 
     if title_string is not None:
-        pyplot.title(title_string, fontsize=option_dict[TITLE_FONT_SIZE])
+        pyplot.title(title_string)
 
 
 def _init_skewT(option_dict):
 
     pyplot.rc('font', size=option_dict[DEFAULT_FONT_SIZE])
-    pyplot.rc('axes', titlesize=option_dict[DEFAULT_FONT_SIZE])
+    pyplot.rc('axes', titlesize=option_dict[TITLE_FONT_SIZE])
     pyplot.rc('axes', labelsize=option_dict[DEFAULT_FONT_SIZE])
     pyplot.rc('xtick', labelsize=option_dict[DEFAULT_FONT_SIZE])
     pyplot.rc('ytick', labelsize=option_dict[DEFAULT_FONT_SIZE])
     pyplot.rc('legend', fontsize=option_dict[DEFAULT_FONT_SIZE])
-    pyplot.rc('figure', titlesize=option_dict[DEFAULT_FONT_SIZE])
-
-    figure_width_inches = option_dict[FIGURE_WIDTH_KEY]
-    figure_height_inches = option_dict[FIGURE_HEIGHT_KEY]
+    pyplot.rc('figure', titlesize=option_dict[TITLE_FONT_SIZE])
 
     figure_object = pyplot.figure(
-        figsize=(figure_width_inches, figure_height_inches)
+        figsize=(option_dict[FIGURE_WIDTH_KEY], option_dict[FIGURE_HEIGHT_KEY])
     )
     skewt_object = metpy.plots.SkewT(figure_object, rotation=45)
 
@@ -266,3 +263,82 @@ def plot_predicted_sounding(sounding_dict, title_string=None, option_dict=None, 
         pyplot.close()
 
     return figure_object, skewt_object
+
+
+def plot_monthly_error(monthly_err, months, title_string=None, option_dict=None, file_name=None):
+    """Plots the monthly errors
+
+    :params
+    ---
+        monthly_err : list
+            RMSE values of N samples
+        months : np.array
+        title_string: str
+        option_dict : dict
+        file_name : str
+            Default `None` does not save profile to disk
+    :return
+    ---
+        fig : figure handle
+        ax : figure axis
+    """
+    if option_dict is None:
+        option_dict = {}
+        orig_option_dict = DEFAULT_OPTION_DICT.copy()
+    else:
+        orig_option_dict = option_dict.copy()
+
+    option_dict.update(orig_option_dict)
+    
+    if file_name:
+        option_dict[DEFAULT_FONT_SIZE] = 25
+        option_dict[TITLE_FONT_SIZE] = 20
+        option_dict[FIGURE_WIDTH_KEY] = 15
+        option_dict[FIGURE_HEIGHT_KEY] = 12
+        markersize = 12
+        markeredgewidth = 2
+    else:
+        option_dict[FIGURE_HEIGHT_KEY] = 6
+        option_dict[MAIN_LINE_WIDTH_KEY] = 2
+        option_dict[GRID_LINE_WIDTH_KEY] = 1
+        markersize = 8
+        markeredgewidth = 1
+        
+    pyplot.rc('font', size=option_dict[DEFAULT_FONT_SIZE])
+    pyplot.rc('axes', titlesize=option_dict[TITLE_FONT_SIZE])
+    pyplot.rc('axes', labelsize=option_dict[DEFAULT_FONT_SIZE])
+    pyplot.rc('xtick', labelsize=option_dict[DEFAULT_FONT_SIZE])
+    pyplot.rc('ytick', labelsize=option_dict[DEFAULT_FONT_SIZE])
+    pyplot.rc('legend', fontsize=option_dict[DEFAULT_FONT_SIZE])
+    pyplot.rc('figure', titlesize=option_dict[TITLE_FONT_SIZE])
+
+    fig, ax = pyplot.subplots(nrows=1, ncols=1, figsize=(option_dict[FIGURE_WIDTH_KEY], 
+                                                         option_dict[FIGURE_HEIGHT_KEY]))
+    
+    ax.boxplot(monthly_err, 
+               flierprops=dict(markersize=markersize, markeredgewidth=markeredgewidth), 
+               boxprops=dict(facecolor='white', linewidth=option_dict[MAIN_LINE_WIDTH_KEY], ), 
+               medianprops=dict(linewidth=option_dict[MAIN_LINE_WIDTH_KEY], color='firebrick'),
+               whiskerprops=dict(linewidth=option_dict[MAIN_LINE_WIDTH_KEY]),
+               capprops=dict(linewidth=option_dict[MAIN_LINE_WIDTH_KEY]),patch_artist=True)
+
+    ax.yaxis.grid(True, linewidth=option_dict[GRID_LINE_WIDTH_KEY])
+    ax.set_xticks(numpy.unique(months))
+    
+    if title_string:
+        ax.set_title(title_string)
+    
+    ax.set_ylabel('RMSE');
+    
+    # TODO: varaible months index into list 
+    pyplot.setp(ax, xticks=numpy.unique(months),
+                xticklabels=['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 
+                             'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'])
+    
+    if file_name:
+        pyplot.savefig(file_name, dpi=option_dict[DOTS_PER_INCH], bbox_inches='tight')
+    else:
+        fig.tight_layout() 
+        
+    pyplot.show()
+    return fig, ax
