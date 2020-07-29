@@ -10,8 +10,10 @@ import pandas as pd
 import pygrib
 from pyproj import Proj
 
+import sys
 
-class GOES16ABI(object):
+
+class RTMALoader(object):
     """Handles data I/O and map projections for Real-Time Mesoscale Analysis data.
 
     :params
@@ -20,11 +22,11 @@ class GOES16ABI(object):
         Path to top level of RTMA directory
     date : class:`datetime.datetime`
         Date of interest
-    time_range_minutes : int  
+    time_range_minutes : int
         interval in number of minutes to search for file that matches input time
     """
 
-    def __init__(self, path, date, time_range_minutes=5):
+    def __init__(self, path, date, time_range_minutes=30):
         if not exists(path):
             raise FileNotFoundError(f'Path: {path} does NOT exist.')
         if not isinstance(date, pd.Timestamp):
@@ -35,14 +37,19 @@ class GOES16ABI(object):
 
         self.rtma_ds = dict()
         self.channel_files = []
-        self.data_index = 1  # TODO: Check which index is always the data
-        self.rtma_types = np.array(['LPI', 'LTI', 'LRI'])
+        self.analysis_index = []
+        self.rtma_types = np.array(['LPI'])  # , 'LTI', 'LRI'
+
         for rtma_type in self.rtma_types:
-            self.channel_files.append(self._goes16_abi_filename(rtma_type))
+            self.channel_files.append(self._rtma_filename(rtma_type))
             self.rtma_ds[rtma_type] = pygrib.open(self.channel_files[-1])
+            for i in range(1, self.rtma_ds[rtma_type].messages + 1):
+                if self.rtma_ds[rtma_type][i]['typeOfGeneratingProcess'] == 0:
+                    self.analysis_index.append(i)
+                    break
 
         self.proj = Proj(self.rtma_ds[self.rtma_types[0]]
-                         [self.data_index].projparams)
+                         [self.analysis_index[0]].projparams)
         self.x = None
         self.y = None
         self.lon = None
@@ -51,68 +58,62 @@ class GOES16ABI(object):
         self._lon_lat_coords()
 
     @staticmethod
-    def _abi_file_dates(files, file_date='e'):
+    def _rtma_file_dates(files):
         """
-        Extract the file creation dates from a list of GOES-16 files.
-        Date format: Year (%Y), Day of Year (%j), Hour (%H), Minute (%M), Second (%s), Tenth of a second
-        See `AWS <https://docs.opendata.aws/noaa-goes16/cics-readme.html>`_ for more details
+        Extract the file creation dates from a list of RTMA files.
+        Date format: Year (%Y), Month (%m), Hour (%H), Minute (%M), Second (%s),
 
         :params
         ---
-        files : list  
-            list of GOES-16 filenames.
-        file_date : str  
-            Date in filename to extract. Valid options are
-            's' (start), 'e' (end), and 'c' (creation, default).
+        files : list
+            list of RTMA filenames.
 
         :returns
         ---
         dates : class:`pandas.DatetimeIndex`
-        Dates for each file
+            dates for each file
         """
-        if file_date not in ['c', 's', 'e']:
-            file_date = 'c'
-        date_index = {"c": -1, "s": -3, "e": -2}
-        channel_dates = pd.DatetimeIndex(
-            [datetime.strptime(c_file[:-3].split("/")[-1].split("_")[date_index[file_date]][1:-1],
-                               "%Y%j%H%M%S") for c_file in files], tz='UTC')
-        return channel_dates
+        return pd.DatetimeIndex(
+            [datetime.strptime(c_file.split("/")[-1].split("_")[-1], "%Y%m%d%H%M")
+             for c_file in files], tz='UTC')
 
-    def _goes16_abi_filename(self, channel):
+    def _rtma_filename(self, rtma_type):
         """
-        Given a path to a dataset of GOES-16 files, find the netCDF file that matches the expected
-        date and channel, or band number.
+        Given a path to a dataset of RTMA files, find the grib file that matches the expected
+        date and rtma type.
 
-        The GOES-16 path should point to a directory containing a series of directories named by
-        valid date in %Y%m%d format. Each directory should contain Level 1 CONUS sector files.
+        The RTMA path should point to a directory containing a series of directories named by
+        valid date in %Y%m%d format.
 
         :params
         ---
-        channel : int
-            GOES-16 ABI `channel <https://www.goes-r.gov/mission/ABI-bands-quick-info.html>`_.
+        rtma_type : str
+            RTMA data type, e.g., pressure, temperature, dewpoint as ['LPI', 'LTI', 'LRI']
 
         :returns
         ---
-        filename : str 
-            full path to requested GOES-16 file
+        filename : str
+            full path to requested RTMA file
         """
-        channel_files = np.array(sorted(glob(join(self.path, self.date.strftime('%Y'), self.date.strftime('%Y_%m_%d_%j'),
-                                                  f"OR_ABI-L1b-RadC-M*C{channel:02d}_G16_*.nc"))))
-        # print("channel_files", channel_files)
-        channel_dates = self._abi_file_dates(channel_files)
-        # print("channel_dates", channel_dates)
-        date_diffs = np.abs(channel_dates - self.date)
+        rtma_files = np.array(sorted(glob(join(self.path, rtma_type.lower(), self.date.strftime('%Y'),
+                                               f"9950_NDGD_{rtma_type}_{self.date.strftime('%Y%m%d')}",
+                                               f"LPIA98_KWBR_{self.date.strftime('%Y%m%d')}*"))))
+        # print("rtma_files", rtma_files)
+        rtma_dates = self._rtma_file_dates(rtma_files)
+        # print("rtma_dates", rtma_dates)
+        date_diffs = np.abs(rtma_dates - self.date)
         # print("Date_diffs", date_diffs)
         file_index = np.where(date_diffs <= pd.Timedelta(
             minutes=self.time_range_minutes))[0]
-        # print("File_index", file_index)
+        # print("File_index", file_index, len(file_index))
         if len(file_index) == 0:
             diff = (date_diffs.total_seconds().values.min() /
                     60) if len(date_diffs) != 0 else float('inf')
-            raise FileNotFoundError('No GOES-16 files within {0:d} minutes of '.format(self.time_range_minutes) + self.date.strftime(
-                "%Y-%m-%d %H:%M:%S" + ". Nearest file is within {0:.3f} minutes".format(diff)))
+            raise FileNotFoundError(
+                f"No {rtma_type} RTMA files within {self.time_range_minutes} minutes of "
+                f"{self.date.strftime('%Y-%m-%d %H:%M:%S')}. Nearest file is within {diff:.3f} minutes")
         else:
-            filename = channel_files[np.argmin(date_diffs)]
+            filename = rtma_files[np.argmin(date_diffs)]
         return filename
 
     def _set_coordinates(self):
@@ -121,7 +122,7 @@ class GOES16ABI(object):
 
         Referenced from here: https://ftp.emc.ncep.noaa.gov/mmb/bblake/plot_allvars.py
         """
-        rtma_ds = self.rtma_ds[self.rtma_types[0]][self.data_index]
+        rtma_ds = self.rtma_ds[self.rtma_types[0]][self.analysis_index[0]]
         lat1 = rtma_ds['latitudeOfFirstGridPointInDegrees']
         lon1 = rtma_ds['longitudeOfFirstGridPointInDegrees']
 
@@ -140,7 +141,8 @@ class GOES16ABI(object):
         llcrnrx = llcrnrx - (dx/2.)
         llcrnry = llcrnry - (dy/2.)
         x = llcrnrx + dx*np.arange(nx)
-        y = (llcrnry + dy*np.arange(ny))[::-1]  # flip vertically
+        # flip vertically
+        y = (llcrnry + dy*np.arange(ny))[::-1]
 
         self.x, self.y = np.meshgrid(x, y)
 
@@ -165,13 +167,13 @@ class GOES16ABI(object):
         self.lon[self.lon > 1e10] = np.nan
         self.lat[self.lat > 1e10] = np.nan
 
-    def extract_image_patch(self, center_lon, center_lat, x_size_pixels, y_size_pixels, bt=True):
+    def extract_image_patch(self, center_lon, center_lat, x_size_pixels, y_size_pixels):
         """
         Extract a subset of an image around a given location.
 
         :params
         ---
-        center_lon : float 
+        center_lon : float
             longitude of the center pixel of the image
         center_lat : float
             latitude of the center pixel of the image
@@ -187,19 +189,22 @@ class GOES16ABI(object):
         lats : ndarray
         """
         center_x, center_y = self.proj(center_lon, center_lat)
-        center_row = np.argmin(np.abs(self.y - center_y))
-        center_col = np.argmin(np.abs(self.x - center_x))
+        center_row = np.unravel_index(
+            np.argmin(np.abs(self.y - center_y)), self.y.shape)[0]
+        center_col = np.unravel_index(
+            np.argmin(np.abs(self.x - center_x)), self.x.shape)[1]
+
         row_slice = slice(int(center_row - y_size_pixels // 2),
                           int(center_row + y_size_pixels // 2))
         col_slice = slice(int(center_col - x_size_pixels // 2),
                           int(center_col + x_size_pixels // 2))
         patch = np.zeros((1, self.rtma_types.size, y_size_pixels,
                           x_size_pixels), dtype=np.float32)
-        for b, rtma_type in enumerate(self.rtma_types):
+        for t, rtma_type in enumerate(self.rtma_types):
             try:
                 # flip vertically
-                values = self.rtma_ds[rtma_type][self.data_index][::-1]
-                patch[0, b, :, :] = values[row_slice, col_slice].values
+                values = self.rtma_ds[rtma_type][self.analysis_index[t]].values[::-1]
+                patch[0, t, :, :] = values[row_slice, col_slice]
             except ValueError as ve:
                 raise ve
 

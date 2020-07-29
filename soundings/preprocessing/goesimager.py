@@ -97,13 +97,13 @@ class GOES16ABI(object):
         files : list  
             list of GOES-16 filenames.
         file_date : str  
-            Date in filename to extract. Valid options are
+            date in filename to extract. Valid options are
             's' (start), 'e' (end), and 'c' (creation, default).
 
         :returns
         ---
         dates : class:`pandas.DatetimeIndex`
-        Dates for each file
+         dates for each file
         """
         if file_date not in ['c', 's', 'e']:
             file_date = 'c'
@@ -275,6 +275,8 @@ def extract_abi_patches(radiosonde_path, abi_path, patch_path, bands=np.array([8
                         patch_x_length_pixels=28, patch_y_length_pixels=28,
                         time_range_minutes=5, bt=False):
     """
+    NOTE: Only works when sounding are of the form US_25Jun2019.cdf with all launches in US for June 25, 2019.
+
     For a given set of gridded GLM counts, sample from the grids at each time step and extract ABI
     patches centered on the lightning grid cell.
 
