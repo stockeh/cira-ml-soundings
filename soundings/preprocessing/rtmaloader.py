@@ -39,12 +39,12 @@ class RTMALoader(object):
         self.rtma_types = rtma_types  # , 'LTI', 'LRI'
 
         self.rtma_ds = dict()
-        self.channel_files = []
+        self.rtma_files = []
         self.analysis_index = []
 
         for rtma_type in self.rtma_types:
-            self.channel_files.append(self._rtma_filename(rtma_type))
-            self.rtma_ds[rtma_type] = pygrib.open(self.channel_files[-1])
+            self.rtma_files.append(self._rtma_filename(rtma_type))
+            self.rtma_ds[rtma_type] = pygrib.open(self.rtma_files[-1])
             for i in range(1, self.rtma_ds[rtma_type].messages + 1):
                 if self.rtma_ds[rtma_type][i]['typeOfGeneratingProcess'] == 0:
                     self.analysis_index.append(i)
