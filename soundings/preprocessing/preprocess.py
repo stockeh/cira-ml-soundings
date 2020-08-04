@@ -1,3 +1,4 @@
+import argparse
 import concurrent.futures
 import sys
 import time as cpytime
@@ -7,6 +8,7 @@ from os.path import exists, join
 import numpy as np
 import pandas as pd
 import xarray as xr
+import yaml
 from scipy import interpolate
 
 from soundings.preprocessing import goesimager, rtmaloader
@@ -40,10 +42,10 @@ class DataHolder(object):
     def save(self, processed_dir):
         patch_ds = xr.Dataset(data_vars={'sonde_rel_time': (self.sonde_time),
                                          'sonde_file': (self.sonde_file),
-                                         'sonde_pres': (('sonde_profile_dims'), self.sonde_pres),
-                                         'sonde_tdry': (('sonde_profile_dims'), self.sonde_tdry),
-                                         'sonde_dp': (('sonde_profile_dims'), self.sonde_dp),
-                                         'sonde_alt': (('sonde_profile_dims'), self.sonde_alt),
+                                         'sonde_pres': (('profile_dims'), self.sonde_pres),
+                                         'sonde_tdry': (('profile_dims'), self.sonde_tdry),
+                                         'sonde_dp': (('profile_dims'), self.sonde_dp),
+                                         'sonde_alt': (('profile_dims'), self.sonde_alt),
                                          'goes_files': (('band'), self.goes_files),
                                          'goes_abi': (('band', 'goes_y', 'goes_x'), self.goes_patches),
                                          'goes_lon': (('goes_y', 'goes_x'), self.goes_patch_lons),
@@ -53,19 +55,19 @@ class DataHolder(object):
                                          'rtma_lon': (('rtma_y', 'rtma_x'), self.rtma_patch_lons),
                                          'rtma_lat': (('rtma_y', 'rtma_x'), self.rtma_patch_lats)
                                          },
-                              coords={'goes_y': np.arange(GOES_CONFIG['patch_y_length_pixels']),
-                                      'goes_x': np.arange(GOES_CONFIG['patch_x_length_pixels']),
-                                      'band': GOES_CONFIG['bands'],
-                                      'rtma_y': np.arange(RTMA_CONFIG['patch_y_length_pixels']),
-                                      'rtma_x': np.arange(RTMA_CONFIG['patch_x_length_pixels']),
-                                      'rtma_type': RTMA_CONFIG['rtma_type'],
-                                      'sonde_profile_dims': np.arange(SONDE_CONFIG['sonde_profile_dims'])})
+                              coords={'goes_y': np.arange(config['goes']['patch_y_length_pixels']),
+                                      'goes_x': np.arange(config['goes']['patch_x_length_pixels']),
+                                      'band': config['goes']['bands'],
+                                      'rtma_y': np.arange(config['rtma']['patch_y_length_pixels']),
+                                      'rtma_x': np.arange(config['rtma']['patch_x_length_pixels']),
+                                      'rtma_type': config['rtma']['rtma_type'],
+                                      'profile_dims': np.arange(config['raob']['profile_dims'])})
 
         patch_ds['sonde_pres'].attrs['units'] = 'hectopascals'
         patch_ds['sonde_tdry'].attrs['units'] = 'celsius'
         patch_ds['sonde_dp'].attrs['units'] = 'celsius'
         patch_ds['sonde_alt'].attrs['units'] = 'meters'
-        patch_ds['goes_abi'].attrs['units'] = 'rad' if GOES_CONFIG['bt'] == False else 'bt'
+        patch_ds['goes_abi'].attrs['units'] = 'rad' if config['goes']['bt'] == False else 'bt'
         patch_ds['rtma_values'].attrs['units'] = 'LPI: something, LTI: something, LRI: something'
 
         out_file = join(
@@ -108,7 +110,7 @@ def set_radiosonde_profile(sonde, path, dataset):
             break
 
     altitude_intervals = np.linspace(
-        alt_s, SONDE_CONFIG['alt_el'], SONDE_CONFIG['sonde_profile_dims'])
+        alt_s, config['raob']['alt_el'], config['raob']['profile_dims'])
 
     dataset.sonde_pres = interpolate_to_height_intervals(
         alt[start_indx:], p[start_indx:], altitude_intervals)
@@ -124,15 +126,15 @@ def set_radiosonde_profile(sonde, path, dataset):
 
 def set_rtma_data(time, lon, lat, dataset):
     try:
-        rtma_timestep = rtmaloader.RTMALoader(RTMA_CONFIG['path'], time, RTMA_CONFIG['rtma_type'],
-                                              time_range_minutes=RTMA_CONFIG['time_range_minutes'])
+        rtma_timestep = rtmaloader.RTMALoader(config['rtma']['path'], time, config['rtma']['rtma_type'],
+                                              time_range_minutes=config['rtma']['time_range_minutes'])
     except FileNotFoundError as fnfe:  # likely missing a file for all bands
         raise fnfe
 
     try:
         patches, patch_lons, \
-            patch_lats = rtma_timestep.extract_image_patch(lon, lat, RTMA_CONFIG['patch_x_length_pixels'],
-                                                           RTMA_CONFIG['patch_y_length_pixels'])
+            patch_lats = rtma_timestep.extract_image_patch(lon, lat, config['rtma']['patch_x_length_pixels'],
+                                                           config['rtma']['patch_y_length_pixels'])
         dataset.rtma_patches = patches[0]
         dataset.rtma_patch_lons = patch_lons
         dataset.rtma_patch_lats = patch_lats
@@ -144,15 +146,15 @@ def set_rtma_data(time, lon, lat, dataset):
 
 def set_goes_data(time, lon, lat, dataset):
     try:
-        goes16_abi_timestep = goesimager.GOES16ABI(GOES_CONFIG['abi_path'], time, GOES_CONFIG['bands'],
-                                                   time_range_minutes=GOES_CONFIG['time_range_minutes'])
+        goes16_abi_timestep = goesimager.GOES16ABI(config['goes']['path'], time, config['goes']['bands'],
+                                                   time_range_minutes=config['goes']['time_range_minutes'])
     except FileNotFoundError as fnfe:  # likely missing a file for all bands
         raise fnfe
 
     try:
         patches, patch_lons, \
-            patch_lats = goes16_abi_timestep.extract_image_patch(lon, lat, GOES_CONFIG['patch_x_length_pixels'],
-                                                                 GOES_CONFIG['patch_y_length_pixels'], bt=GOES_CONFIG['bt'])
+            patch_lats = goes16_abi_timestep.extract_image_patch(lon, lat, config['goes']['patch_x_length_pixels'],
+                                                                 config['goes']['patch_y_length_pixels'], bt=config['goes']['bt'])
         dataset.goes_patches = patches[0]
         dataset.goes_patch_lons = patch_lons
         dataset.goes_patch_lats = patch_lats
@@ -162,19 +164,20 @@ def set_goes_data(time, lon, lat, dataset):
         raise ve
 
 
-def extract_all_information(root_path):
+def extract_all_information():
 
     start_t = cpytime.time()
 
-    with open(root_path + 'raobs/profiles-alt-files-processed.txt') as fp:
+    with open(config['raob']['valid_files_path']) as fp:
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
             path = fp.readline().rstrip('\n')
             while path:
                 if '.20190912.' not in path:
                     path = fp.readline().rstrip('\n')
                     continue
-
-                sonde = xr.open_dataset(root_path + path[38:])
+                # arm-sgp / year / file.cdf
+                sonde = xr.open_dataset(
+                    join(config['raob']['path'], *path.split('/')[-3:]))
                 dataset = DataHolder(sonde)
 
                 futures = []
@@ -193,7 +196,7 @@ def extract_all_information(root_path):
                             _ = future.result()
                         except Exception as e:
                             raise e
-                    dataset.save(root_path + 'processed')
+                    dataset.save(config['output_path'])
                 except Exception as e:
                     print('ERROR:', e)
 
@@ -205,10 +208,20 @@ def extract_all_information(root_path):
     print(f"runtime: {cpytime.time()-start_t}")
 
 
-def set_configs(sonde_config, goes_config, rtma_config, nwp_config=None):
-    global SONDE_CONFIG, GOES_CONFIG, RTMA_CONFIG, NWP_CONFIG
-    # TODO: REPLACE WITH MAIN
-    SONDE_CONFIG = sonde_config
-    GOES_CONFIG = goes_config
-    RTMA_CONFIG = rtma_config
-    NWP_CONFIG = nwp_config
+def main(config_path):
+    global config
+    with open(config_path, 'r') as stream:
+        try:
+            config = yaml.safe_load(stream)
+        except yaml.YAMLError as exc:
+            print(exc)
+            sys.exit(1)
+    extract_all_information()
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='data preprocessing')
+    parser.add_argument('-c', '--config', metavar='path', type=str,
+                        required=True, help='the path to config file')
+    args = parser.parse_args()
+    main(config_path=args.config)

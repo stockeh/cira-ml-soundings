@@ -1,0 +1,21 @@
+goes:
+  bands: [8, 9, 10, 11, 13, 14, 15, 16]
+  patch_x_length_pixels: 28
+  patch_y_length_pixels: 28
+  time_range_minutes: 5
+  bt: False
+  path: /Users/stock/Development/research/soundings/data/subset/goes
+raob:
+  profile_dims: 2048
+  alt_el: 18000
+  path: /Users/stock/Development/research/soundings/data/raobs
+  valid_files_path: /Users/stock/Development/research/soundings/data/raobs/profiles-alt-files-processed.txt
+rtma:
+  rtma_type: [LPI]
+  patch_x_length_pixels: 28
+  patch_y_length_pixels: 28
+  time_range_minutes: 30
+  path: /Users/stock/Development/research/soundings/data/subset/rtma
+rap:
+  something: 3.14159265
+output_path: /Users/stock/Development/research/soundings/data/processed

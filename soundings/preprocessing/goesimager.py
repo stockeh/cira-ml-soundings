@@ -64,6 +64,8 @@ class GOES16ABI(object):
             raise FileNotFoundError(f'Path: {path} does NOT exist.')
         if not isinstance(date, pd.Timestamp):
             date = pd.Timestamp(date, unit='s', tz='UTC')
+        if not isinstance(bands, np.ndarray):
+            bands = np.array(bands)
         self.date = date
         self.path = path
         self.bands = bands

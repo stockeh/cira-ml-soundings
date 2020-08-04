@@ -31,11 +31,11 @@ class RTMALoader(object):
             raise FileNotFoundError(f'Path: {path} does NOT exist.')
         if not isinstance(date, pd.Timestamp):
             date = pd.Timestamp(date, unit='s', tz='UTC')
+        if not isinstance(rtma_types, np.ndarray):
+            rtma_types = np.array(rtma_types)
         self.date = date
         self.path = path
         self.time_range_minutes = time_range_minutes
-        if not isinstance(rtma_types, np.ndarray):
-            rtma_types = np.array(rtma_types)
         self.rtma_types = rtma_types  # , 'LTI', 'LRI'
 
         self.rtma_ds = dict()
