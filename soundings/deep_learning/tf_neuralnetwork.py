@@ -42,11 +42,12 @@ class NeuralNetwork():
 
         X = tf.keras.Input(shape=(n_inputs,))
         Z = X
-        for i, units in enumerate(n_hiddens_list):
-            Z = tf.keras.layers.Dense(units, activation=activation)(Z)
-            if i % 2 == 0:
-                Z = tf.keras.layers.BatchNormalization()(Z)
-        Y = tf.keras.layers.Dense(n_outputs)(Z)
+        if not (n_hiddens_list == [] or n_hiddens_list == [0]):
+            for i, units in enumerate(n_hiddens_list):
+                Z = tf.keras.layers.Dense(units, activation=activation)(Z)
+                if i % 2 == 0:
+                    Z = tf.keras.layers.BatchNormalization()(Z)
+            Y = tf.keras.layers.Dense(n_outputs)(Z)
 
         self.model = tf.keras.Model(inputs=X, outputs=Y)
 
