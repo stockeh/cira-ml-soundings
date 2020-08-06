@@ -47,8 +47,7 @@ class NeuralNetwork():
                 Z = tf.keras.layers.Dense(units, activation=activation)(Z)
                 if i % 2 == 0:
                     Z = tf.keras.layers.BatchNormalization()(Z)
-            Y = tf.keras.layers.Dense(n_outputs)(Z)
-
+        Y = tf.keras.layers.Dense(n_outputs)(Z)
         self.model = tf.keras.Model(inputs=X, outputs=Y)
 
         self.Xmeans = None
