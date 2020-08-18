@@ -98,8 +98,7 @@ class RTMALoader(object):
             full path to requested RTMA file
         """
         rtma_files = np.array(sorted(glob(join(self.path, rtma_type.lower(), self.date.strftime('%Y'),
-                                               f"9950_NDGD_{rtma_type}_{self.date.strftime('%Y%m%d')}",
-                                               f"LPIA98_KWBR_{self.date.strftime('%Y%m%d')}*"))))
+                                               f"*_{rtma_type}_{self.date.strftime('%Y%m%d')}", "*"))))
         # print("rtma_files", rtma_files)
         rtma_dates = self._rtma_file_dates(rtma_files)
         # print("rtma_dates", rtma_dates)

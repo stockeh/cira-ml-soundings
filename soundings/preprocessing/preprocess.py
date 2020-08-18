@@ -29,6 +29,14 @@ class DataHolder(object):
         self.sonde_alt = None
         self.sonde_site_id = None
 
+        self.nwp_file = None
+        self.nwp_lon = None
+        self.nwp_lat = None
+        self.nwp_pres = None
+        self.nwp_tdry = None
+        self.nwp_spfm = None
+        self.nwp_alt = None
+        
         self.goes_files = None
         self.goes_patches = None
         self.goes_patch_lons = None
@@ -46,6 +54,13 @@ class DataHolder(object):
                                          'sonde_tdry': (('profile_dims'), self.sonde_tdry),
                                          'sonde_dp': (('profile_dims'), self.sonde_dp),
                                          'sonde_alt': (('profile_dims'), self.sonde_alt),
+                                         'nwp_file': (self.nwp_file),
+                                         'nwp_lon': (self.nwp_file),
+                                         'nwp_lat': (self.nwp_file),
+                                         'nwp_pres': (('nwp_dims'), self.nwp_pres),
+                                         'nwp_tdry': (('nwp_dims'), self.nwp_tdry),
+                                         'nwp_spfm': (('nwp_dims'), self.nwp_spfm),
+                                         'nwp_alt': (('nwp_dims'), self.nwp_alt),
                                          'goes_files': (('band'), self.goes_files),
                                          'goes_abi': (('band', 'goes_y', 'goes_x'), self.goes_patches),
                                          'goes_lon': (('goes_y', 'goes_x'), self.goes_patch_lons),
@@ -61,7 +76,8 @@ class DataHolder(object):
                                       'rtma_y': np.arange(config['rtma']['patch_y_length_pixels']),
                                       'rtma_x': np.arange(config['rtma']['patch_x_length_pixels']),
                                       'rtma_type': config['rtma']['rtma_type'],
-                                      'profile_dims': np.arange(config['raob']['profile_dims'])})
+                                      'profile_dims': np.arange(config['raob']['profile_dims']),
+                                      'nwp_dims': np.arange(config['nwp']['nwp_dims'])})
 
         patch_ds['sonde_pres'].attrs['units'] = 'hectopascals'
         patch_ds['sonde_tdry'].attrs['units'] = 'celsius'
@@ -84,7 +100,7 @@ def interpolate_to_height_intervals(alt, y, altitude_intervals):
 
 
 def set_nwp_profile(time, lon, lat, dataset):
-
+    
     pass
 
 
@@ -142,6 +158,8 @@ def set_rtma_data(time, lon, lat, dataset):
 
     except ValueError as ve:  # likely invalid lon/lat
         raise ve
+        
+    rtma_timestep.close()
 
 
 def set_goes_data(time, lon, lat, dataset):
@@ -162,6 +180,8 @@ def set_goes_data(time, lon, lat, dataset):
 
     except ValueError as ve:  # likely invalid lon/lat
         raise ve
+        
+    goes16_abi_timestep.close()
 
 
 def extract_all_information():

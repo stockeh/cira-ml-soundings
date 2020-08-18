@@ -4,18 +4,20 @@ goes:
   patch_y_length_pixels: 28
   time_range_minutes: 5
   bt: False
-  path: /Users/stock/Development/research/soundings/data/subset/goes
+  path: /mnt/mlnas01/mlsoundings/goes
 raob:
   profile_dims: 2048
   alt_el: 18000
-  path: /Users/stock/Development/research/soundings/data/raobs
-  valid_files_path: /Users/stock/Development/research/soundings/data/raobs/profiles-alt-files-processed.txt
+  path: /mnt/mlnas01/mlsoundings/raobs
+  valid_files_path: /mnt/data1/stock/mlsoundings/raobs/profiles-alt-files-processed.txt
 rtma:
-  rtma_type: [LPI]
+  rtma_type: [LPI, LRI, LTI]
   patch_x_length_pixels: 28
   patch_y_length_pixels: 28
   time_range_minutes: 30
-  path: /Users/stock/Development/research/soundings/data/subset/rtma
-rap:
-  something: 3.14159265
-output_path: /Users/stock/Development/research/soundings/data/processed
+  path: /mnt/mlnas01/mlsoundings/rtma
+nwp:
+  nwp_dims: 50
+  time_range_minutes: 60
+  path: /mnt/data1/stock/mlsoundings/rap
+output_path: /mnt/data1/stock/mlsoundings/processed
