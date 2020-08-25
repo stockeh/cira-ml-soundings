@@ -9,6 +9,8 @@ WIND_DIR_COLUMN_KEY = 'wind_dir_deg'
 PREDICTED_TEMPERATURE_COLUMN_KEY = 'predicted_temperatures_deg_c'
 PREDICTED_DEWPOINT_COLUMN_KEY = 'predicted_dewpoints_deg_c'
 
+NWP_TEMPERATURE_COLUMN_KEY = 'nwp_temperatures_deg_c'
+NWP_DEWPOINT_COLUMN_KEY = 'nwp_dewpoints_deg_c'
 
 def convert_metpy_winds(sounding_dict):
     """Convert windspeed and wind direction to MetPy units

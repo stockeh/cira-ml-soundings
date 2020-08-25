@@ -9,6 +9,9 @@ import metpy.plots
 import metpy.units
 import metpy.calc
 import numpy
+import warnings
+import matplotlib.cbook
+warnings.filterwarnings("ignore",category=matplotlib.cbook.mplDeprecation)
 
 from soundings.utils import radiosonde_utils
 
@@ -17,6 +20,7 @@ from soundings.utils import radiosonde_utils
 
 MAIN_LINE_COLOUR_KEY = 'main_line_colour'
 PREDICTED_LINE_COLOUR_KEY = 'predicted_line_colour'
+NWP_LINE_COLOUR_KEY = 'nwp_line_colour'
 MAIN_LINE_WIDTH_KEY = 'main_line_width'
 DRY_ADIABAT_COLOUR_KEY = 'dry_adiabat_colour'
 MOIST_ADIABAT_COLOUR_KEY = 'moist_adiabat_colour'
@@ -33,6 +37,7 @@ DOTS_PER_INCH = 'dots_per_inch'
 DEFAULT_OPTION_DICT = {
     MAIN_LINE_COLOUR_KEY: numpy.array([0, 0, 0], dtype=float),
     PREDICTED_LINE_COLOUR_KEY: numpy.array([44, 114, 230], dtype=float) / 255,
+    NWP_LINE_COLOUR_KEY: numpy.array([162, 20, 47], dtype=float) / 255,
     MAIN_LINE_WIDTH_KEY: 3,
     DRY_ADIABAT_COLOUR_KEY: numpy.array([217, 95, 2], dtype=float) / 255,
     MOIST_ADIABAT_COLOUR_KEY: numpy.array([117, 112, 179], dtype=float) / 255,
@@ -106,12 +111,17 @@ def _plot_attributes(skewt_object, option_dict, title_string):
     x_tick_labels = [
         '{0:d}'.format(int(numpy.round(x))) for x in axes_object.get_xticks()
     ]
-    axes_object.set_xticklabels(x_tick_labels)
+    
+    axes_object.set_xticklabels(labels=x_tick_labels)
 
     y_tick_labels = [
         '{0:d}'.format(int(numpy.round(y))) for y in axes_object.get_yticks()
     ]
-    axes_object.set_yticklabels(y_tick_labels)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        # UserWarning: FixedFormatter should only be used 
+        # together with FixedLocator
+        axes_object.set_yticklabels(labels=y_tick_labels)
     # TODO: Shouldn't need this hack...
     axes_object.set_xlim(-40, 50)
 
@@ -238,9 +248,6 @@ def plot_predicted_sounding(sounding_dict, title_string=None, option_dict=None, 
 
     if file_name:
         _init_save_img(option_dict)
-    
-    predicted_line_colour = option_dict[PREDICTED_LINE_COLOUR_KEY]
-    main_line_width = option_dict[MAIN_LINE_WIDTH_KEY] / 1.75
 
     figure_object, skewt_object = plot_sounding(
         sounding_dict, title_string, option_dict)
@@ -248,7 +255,9 @@ def plot_predicted_sounding(sounding_dict, title_string=None, option_dict=None, 
     pressure = radiosonde_utils.convert_metpy_pressure(sounding_dict)
     predicted_temperatures_deg_c = sounding_dict[radiosonde_utils.PREDICTED_TEMPERATURE_COLUMN_KEY] * \
         metpy.units.units.degC
-
+    
+    predicted_line_colour = option_dict[PREDICTED_LINE_COLOUR_KEY]
+    main_line_width = option_dict[MAIN_LINE_WIDTH_KEY] / 1.85
     skewt_object.plot(
         pressure, predicted_temperatures_deg_c,
         color=colour_from_numpy_to_tuple(predicted_line_colour),
@@ -256,6 +265,71 @@ def plot_predicted_sounding(sounding_dict, title_string=None, option_dict=None, 
     )
 
     pyplot.legend(('T', 'Y'), fontsize=option_dict[DEFAULT_FONT_SIZE])
+    
+    if file_name:
+        pyplot.savefig(file_name, dpi=option_dict[DOTS_PER_INCH])
+        pyplot.show()
+        pyplot.close()
+
+    return figure_object, skewt_object
+
+
+def plot_nwp_ml_sounding(sounding_dict, title_string=None, option_dict=None, file_name=None):
+    """Plots radiosonde, nwp profile, and ML prediction.
+
+    H = number of vertical levels in sounding
+    :params
+    ---
+        sounding_dict : dict
+            The following keys: pressures_mb, temperatures_deg_c, dewpoints_deg_c
+            predicted_temperature_c
+        title_string : str
+        option_dict : dict
+        file_name : str
+            Default `None` does not save profile to disk
+    :return
+    ---
+        figure_object : Figure handle
+        skewt_object : SkewT handle (skewt_object.ax)
+    """
+    if option_dict is None:
+        option_dict = {}
+        orig_option_dict = DEFAULT_OPTION_DICT.copy()
+    else:
+        orig_option_dict = option_dict.copy()
+
+    option_dict.update(orig_option_dict)
+
+    if file_name:
+        _init_save_img(option_dict)
+
+    figure_object, skewt_object = plot_sounding(
+        sounding_dict, title_string, option_dict)
+    
+    pressure = radiosonde_utils.convert_metpy_pressure(sounding_dict)
+    nwp_temperatures_deg_c = sounding_dict[radiosonde_utils.NWP_TEMPERATURE_COLUMN_KEY] * \
+    metpy.units.units.degC
+
+    nwp_line_colour = option_dict[NWP_LINE_COLOUR_KEY]
+    main_line_width = option_dict[MAIN_LINE_WIDTH_KEY] / 1.85
+    skewt_object.plot(
+        pressure, nwp_temperatures_deg_c,
+        color=colour_from_numpy_to_tuple(nwp_line_colour),
+        linewidth=main_line_width, linestyle='solid'
+    )
+    
+    predicted_temperatures_deg_c = sounding_dict[radiosonde_utils.PREDICTED_TEMPERATURE_COLUMN_KEY] * \
+        metpy.units.units.degC
+    
+    predicted_line_colour = option_dict[PREDICTED_LINE_COLOUR_KEY]
+    main_line_width = option_dict[MAIN_LINE_WIDTH_KEY] / 1.85
+    skewt_object.plot(
+        pressure, predicted_temperatures_deg_c,
+        color=colour_from_numpy_to_tuple(predicted_line_colour),
+        linewidth=main_line_width, linestyle='solid'
+    )
+
+    pyplot.legend(('RAOB', 'NWP', 'ML'), fontsize=option_dict[DEFAULT_FONT_SIZE])
     
     if file_name:
         pyplot.savefig(file_name, dpi=option_dict[DOTS_PER_INCH])

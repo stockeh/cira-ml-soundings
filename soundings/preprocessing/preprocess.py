@@ -2,8 +2,9 @@ import argparse
 import concurrent.futures
 import sys
 import time as cpytime
-from os import makedirs
+import os
 from os.path import exists, join
+from glob import glob
 
 import numpy as np
 import pandas as pd
@@ -11,7 +12,7 @@ import xarray as xr
 import yaml
 from scipy import interpolate
 
-from soundings.preprocessing import goesimager, rtmaloader
+from soundings.preprocessing import goesimager, rtmaloader, raploader
 
 
 class DataHolder(object):
@@ -90,7 +91,11 @@ class DataHolder(object):
             processed_dir, f"{self.sonde_site_id}_{self.sonde_time.strftime('%Y_%m_%d_%H%M')}.nc")
         print(out_file)
         if not exists(processed_dir):
-            makedirs(processed_dir)
+            os.makedirs(processed_dir)
+        try:
+            os.remove(out_file)
+        except OSError:
+            pass
         patch_ds.to_netcdf(out_file, engine='netcdf4')
 
 
@@ -100,8 +105,20 @@ def interpolate_to_height_intervals(alt, y, altitude_intervals):
 
 
 def set_nwp_profile(time, lon, lat, dataset):
+    try:
+        rap_timestep = raploader.RAPLoader(config['nwp']['path'], time, 
+                                              time_range_minutes=config['nwp']['time_range_minutes'])
+    except FileNotFoundError as fnfe:  # likely missing a file for all bands
+        raise fnfe
+    pres, temp, spec, height, rap_lon, rap_lat = rap_timestep.extract_rap_profile(lon, lat)
     
-    pass
+    dataset.nwp_file = rap_timestep.rap_file
+    dataset.nwp_lon = rap_lon
+    dataset.nwp_lat = rap_lat
+    dataset.nwp_pres = pres
+    dataset.nwp_tdry = temp
+    dataset.nwp_spfm = spec
+    dataset.nwp_alt = height
 
 
 def set_radiosonde_profile(sonde, path, dataset):
@@ -116,7 +133,7 @@ def set_radiosonde_profile(sonde, path, dataset):
     alt = sonde.alt.values
 
     alt_s = alt[0]
-
+    
     # remove duplicate values at surface level
     start_indx = 0
     for i in range(1, len(alt)):
@@ -127,9 +144,12 @@ def set_radiosonde_profile(sonde, path, dataset):
 
     altitude_intervals = np.linspace(
         alt_s, config['raob']['alt_el'], config['raob']['profile_dims'])
-
+    print(start_indx)
+    print(t)
+    print(td)
     dataset.sonde_pres = interpolate_to_height_intervals(
         alt[start_indx:], p[start_indx:], altitude_intervals)
+    print(2)
     dataset.sonde_tdry = interpolate_to_height_intervals(
         alt[start_indx:], t[start_indx:], altitude_intervals)
     dataset.sonde_dp = interpolate_to_height_intervals(
@@ -172,7 +192,8 @@ def set_goes_data(time, lon, lat, dataset):
     try:
         patches, patch_lons, \
             patch_lats = goes16_abi_timestep.extract_image_patch(lon, lat, config['goes']['patch_x_length_pixels'],
-                                                                 config['goes']['patch_y_length_pixels'], bt=config['goes']['bt'])
+                                                                 config['goes']['patch_y_length_pixels'], 
+                                                                 bt=config['goes']['bt'])
         dataset.goes_patches = patches[0]
         dataset.goes_patch_lons = patch_lons
         dataset.goes_patch_lats = patch_lats
@@ -187,18 +208,25 @@ def set_goes_data(time, lon, lat, dataset):
 def extract_all_information():
 
     start_t = cpytime.time()
-
+    
+    already_processed = glob(join(config['output_path'], '*'))
+    
     with open(config['raob']['valid_files_path']) as fp:
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
             path = fp.readline().rstrip('\n')
             while path:
-                if '.20190912.' not in path:
+                if '.20200208' not in path:
                     path = fp.readline().rstrip('\n')
                     continue
+        
                 # arm-sgp / year / file.cdf
                 sonde = xr.open_dataset(
                     join(config['raob']['path'], *path.split('/')[-3:]))
                 dataset = DataHolder(sonde)
+                
+                if f"{config['output_path']}/sgp_{dataset.sonde_time.strftime('%Y_%m_%d_%H%M')}.nc" in already_processed:
+                    path = fp.readline().rstrip('\n')
+                    continue
 
                 futures = []
 
@@ -211,7 +239,7 @@ def extract_all_information():
                 futures.append(pool.submit(set_nwp_profile, dataset.sonde_time, dataset.sonde_lon,
                                            dataset.sonde_lat, dataset))
                 try:
-                    for future in concurrent.futures.as_completed(futures, timeout=5):
+                    for future in concurrent.futures.as_completed(futures, timeout=20):
                         try:
                             _ = future.result()
                         except Exception as e:
@@ -240,6 +268,9 @@ def main(config_path):
 
 
 if __name__ == "__main__":
+    """
+    Usage: python -m soundings.preprocessing.preprocess -c ./soundings/preprocessing/config.yaml
+    """
     parser = argparse.ArgumentParser(description='data preprocessing')
     parser.add_argument('-c', '--config', metavar='path', type=str,
                         required=True, help='the path to config file')

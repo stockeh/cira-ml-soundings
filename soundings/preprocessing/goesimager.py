@@ -133,7 +133,7 @@ class GOES16ABI(object):
         filename : str 
             full path to requested GOES-16 file
         """
-        channel_files = np.array(sorted(glob(join(self.path, self.date.strftime('%Y'), self.date.strftime('%Y_%m_%d_%j'),
+        channel_files = np.array(sorted(glob(join(self.path, self.date.strftime('%Y'), 'l1b', self.date.strftime('%Y_%m_%d_%j'),
                                                   f"OR_ABI-L1b-RadC-M*C{channel:02d}_G16_*.nc"))))
         # print("channel_files", channel_files)
         channel_dates = self._abi_file_dates(channel_files)

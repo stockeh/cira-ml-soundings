@@ -114,20 +114,21 @@ class NeuralNetwork():
                     f'validation must be of the following shape: (X, T)')
 
         try:
-            algo = [tf.keras.optimizers.SGD, tf.keras.optimizers.Adam][[
-                'sgd', 'adam'].index(method)]
+            if method == 'sgd':
+                algo = tf.keras.optimizers.SGD(learning_rate=learning_rate)
+            elif method == 'adam':
+                algo = tf.keras.optimizers.Adam(learning_rate=learning_rate)
         except:
             raise Exception(
                 "train: method={method} not one of 'scg' or 'adam'")
 
         loss = tf.keras.losses.MSE if loss_f == None else loss_f
-        self.model.compile(optimizer=algo(learning_rate), loss=loss,
+        self.model.compile(optimizer=algo, loss=loss,
                            metrics=[tf.keras.metrics.RootMeanSquaredError()])
 
         # log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         # , tf.keras.callbacks.TensorBoard(histogram_freq=1)
         callback = [TrainLogger(n_epochs, step=5)] if verbose else None
-
         start_time = time.time()
         self.history = self.model.fit(X, T, batch_size=batch_size, epochs=n_epochs,
                                       verbose=0, callbacks=callback,
@@ -136,14 +137,16 @@ class NeuralNetwork():
         return self
 
     def use(self, X):
+        # Set to error logging after model is trained
+        tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
         X = self._standardizeX(X)
         Y = self._unstandardizeT(self.model.predict(X))
         return Y
-
+    
 
 class ConvolutionalNeuralNetwork(NeuralNetwork):
     def __init__(self, n_inputs, n_units_in_conv_layers,
-                 kernels_size_and_stride, n_outputs, activation='relu', seed=None):
+                 kernels_size_and_stride, n_outputs, activation='tanh', seed=None):
 
         if not isinstance(n_units_in_conv_layers, (list, tuple)):
             raise Exception(
@@ -172,6 +175,7 @@ class ConvolutionalNeuralNetwork(NeuralNetwork):
             Z = tf.keras.layers.Conv1D(
                 units, kernel_size=kernel, strides=stride,  activation=activation, padding='same')(Z)
             Z = tf.keras.layers.MaxPooling1D(pool_size=2)(Z)
+            Z = tf.keras.layers.Dropout(0.20)(Z)
         Y = tf.keras.layers.Dense(n_outputs)(tf.keras.layers.Flatten()(Z))
 
         self.model = tf.keras.Model(inputs=X, outputs=Y)
@@ -246,6 +250,59 @@ class ConvolutionalAutoEncoder(NeuralNetwork):
             activation=activation, padding='same')(Z)      
         # Y = tf.keras.layers.Flatten()(Z)
         Y = tf.keras.layers.Dense(n_inputs[0])(tf.keras.layers.Flatten()(Z))
+        self.model = tf.keras.Model(inputs=X, outputs=Y)
+
+        self.Xmeans = None
+        self.Xstds = None
+        self.Tmeans = None
+        self.Tstds = None
+
+        self.history = None
+        self.training_time = None
+
+    def __repr__(self):
+        str = f'{type(self).__name__}({self.n_inputs}, {self.n_units_in_conv_layers}, {self.kernels_size_and_stride}, {self.n_outputs})'
+        if self.history:
+            str += f"\n  Final objective value is {self.history['loss'][-1]:.5f} in {self.training_time:.4f} seconds."
+        else:
+            str += '  Network is not trained.'
+        return str
+
+    
+class SpatialConvolutionalNeuralNetwork(NeuralNetwork):
+    def __init__(self, n_inputs, n_units_in_conv_layers,
+                 kernels_size_and_stride, n_outputs, activation='tanh', seed=None):
+
+        if not isinstance(n_units_in_conv_layers, (list, tuple)):
+            raise Exception(
+                f'{type(self).__name__}: n_units_in_conv_layers must be a list.')
+
+        if not isinstance(kernels_size_and_stride, list):
+            raise Exception(
+                f'{type(self).__name__}: kernels_size_and_stride must be a list.')
+
+        if seed:
+            self.seed = seed
+            np.random.seed(seed)
+            random.seed(seed)
+            tf.random.set_seed(seed)
+                  
+        tf.keras.backend.clear_session()
+
+        self.n_inputs = n_inputs
+        self.n_units_in_conv_layers = n_units_in_conv_layers
+        self.kernels_size_and_stride = kernels_size_and_stride
+        self.n_outputs = n_outputs
+
+        X = tf.keras.Input(shape=n_inputs)
+        Z = X
+        for (kernel, stride), units in zip(kernels_size_and_stride, n_units_in_conv_layers):
+            Z = tf.keras.layers.Conv1D(
+                units, kernel_size=kernel, strides=stride,  activation=activation, padding='same')(Z)
+            Z = tf.keras.layers.MaxPooling1D(pool_size=2)(Z)
+            Z = tf.keras.layers.Dropout(0.20)(Z)
+        Y = tf.keras.layers.Dense(n_outputs)(tf.keras.layers.Flatten()(Z))
+
         self.model = tf.keras.Model(inputs=X, outputs=Y)
 
         self.Xmeans = None
