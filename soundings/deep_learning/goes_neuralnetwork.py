@@ -26,7 +26,10 @@ class GOESNeuralNetwork():
         self.n_outputs = n_outputs
         
         X1 = Z = tf.keras.Input(shape=n_goes_inputs, name='goes')
-        Z = tf.keras.layers.Conv2D(1, kernel_size=(3,3), strides=1,
+        Z = tf.keras.layers.Conv2D(10, kernel_size=(3,3), strides=1,
+                                   activation='tanh', padding='same')(Z)
+        Z = tf.keras.layers.MaxPooling2D(pool_size=(2,2))(Z)
+        Z = tf.keras.layers.Conv2D(10, kernel_size=(3,3), strides=1,
                                    activation='tanh', padding='same')(Z)
         Z = tf.keras.layers.MaxPooling2D(pool_size=(2,2))(Z)
         
@@ -36,7 +39,7 @@ class GOESNeuralNetwork():
         X2 = tf.keras.Input(shape=n_rap_inputs, name='rap')
         Z = tf.keras.layers.Concatenate(axis=2)([X2, out])
 
-        Z = tf.keras.layers.Conv1D(32, kernel_size=10, strides=1, activation='tanh', padding='same')(Z)
+        Z = tf.keras.layers.Conv1D(1, kernel_size=10, strides=1, activation='tanh', padding='same')(Z)
         Z = tf.keras.layers.MaxPooling1D(pool_size=2)(Z)
         Y = tf.keras.layers.Dense(n_outputs, name='out')(tf.keras.layers.Flatten()(Z))
 
@@ -150,5 +153,6 @@ class GOESNeuralNetwork():
         tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
         goes = self._standardizeGOES(goes)
         rap  = self._standardizeRAP(rap)
+#         Y = self.model.predict({'goes': goes, 'rap': rap})
         Y = self._unstandardizeRAOB(self.model.predict({'goes': goes, 'rap': rap}))
         return Y

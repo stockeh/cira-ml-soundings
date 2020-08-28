@@ -110,7 +110,7 @@ def set_nwp_profile(time, lon, lat, dataset):
                                               time_range_minutes=config['nwp']['time_range_minutes'])
     except FileNotFoundError as fnfe:  # likely missing a file for all bands
         raise fnfe
-    pres, temp, spec, height, rap_lon, rap_lat = rap_timestep.extract_rap_profile(lon, lat)
+    pres, temp, spec, height, rap_lon, rap_lat = rap_timestep.extract_rap_profile(lon, lat, config['nwp']['wgrib2'])
     
     dataset.nwp_file = rap_timestep.rap_file
     dataset.nwp_lon = rap_lon

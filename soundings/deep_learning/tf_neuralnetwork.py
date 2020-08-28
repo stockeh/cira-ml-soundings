@@ -2,11 +2,23 @@ import copy
 import datetime
 import time
 import random
+import pickle
 
 import numpy as np
 import tensorflow as tf
 
 from soundings.deep_learning import callbacks
+
+
+def loadnn(path):
+    try:
+        with open(path + '/class.pickle', 'rb') as f:
+            c = pickle.load(f)
+        c.model = tf.keras.models.load_model(path)
+        return c
+    except Exception as e:
+        print(e)
+        
 
 class NeuralNetwork():
     def __init__(self, n_inputs, n_hiddens_list, n_outputs, activation='tanh', seed=None):
@@ -15,12 +27,8 @@ class NeuralNetwork():
             raise Exception(
                 f'{type(self).__name__}: n_hiddens_list must be a list.')
 
-        if seed:
-            self.seed = seed
-            np.random.seed(seed)
-            random.seed(seed)
-            tf.random.set_seed(seed)
-                  
+        self.seed = seed
+        self.set_seed()
         tf.keras.backend.clear_session()
 
         self.n_inputs = n_inputs
@@ -52,6 +60,12 @@ class NeuralNetwork():
         else:
             str += '  Network is not trained.'
         return str
+    
+    def _set_seed(self):
+        if self.seed:
+            np.random.seed(self.seed)
+            random.seed(self.seed)
+            tf.random.set_seed(self.seed)
 
     def _setup_standardize(self, X, T):
         if self.Xmeans is None:
@@ -88,6 +102,7 @@ class NeuralNetwork():
               verbose=False, learning_rate=0.001, validation=None, loss_f=None):
         """Use Keras Functional API to train model"""
 
+        self._set_seed()
         self._setup_standardize(X, T)
         X = self._standardizeX(X)
         T = self._standardizeT(T)
@@ -99,7 +114,7 @@ class NeuralNetwork():
             except:
                 raise TypeError(
                     f'validation must be of the following shape: (X, T)')
-
+                
         try:
             if method == 'sgd':
                 algo = tf.keras.optimizers.SGD(learning_rate=learning_rate)
@@ -113,8 +128,6 @@ class NeuralNetwork():
         self.model.compile(optimizer=algo, loss=loss,
                            metrics=[tf.keras.metrics.RootMeanSquaredError()])
 
-        # log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-        # , tf.keras.callbacks.TensorBoard(histogram_freq=1)
         callback = [callbacks.TrainLogger(n_epochs, step=5)] if verbose else None
         start_time = time.time()
         self.history = self.model.fit(X, T, batch_size=batch_size, epochs=n_epochs,
@@ -129,6 +142,14 @@ class NeuralNetwork():
         X = self._standardizeX(X)
         Y = self._unstandardizeT(self.model.predict(X))
         return Y
+    
+    def save(self, path):
+        self.model.save(path)
+        del self.model
+        with open(path + '/class.pickle', 'wb') as f:
+            pickle.dump(self, f)
+        self.model = tf.keras.models.load_model(path)
+  
     
 
 class ConvolutionalNeuralNetwork(NeuralNetwork):
@@ -158,11 +179,14 @@ class ConvolutionalNeuralNetwork(NeuralNetwork):
 
         X = tf.keras.Input(shape=n_inputs)
         Z = X
+        i = 0
         for (kernel, stride), units in zip(kernels_size_and_stride, n_units_in_conv_layers):
             Z = tf.keras.layers.Conv1D(
                 units, kernel_size=kernel, strides=stride, activation=activation, padding='same')(Z)
             Z = tf.keras.layers.MaxPooling1D(pool_size=2)(Z)
-            Z = tf.keras.layers.Dropout(0.20)(Z)
+            if i % 2 == 0:
+                Z = tf.keras.layers.Dropout(0.20)(Z)
+            i += 1
         Y = tf.keras.layers.Dense(n_outputs)(tf.keras.layers.Flatten()(Z))
 
         self.model = tf.keras.Model(inputs=X, outputs=Y)

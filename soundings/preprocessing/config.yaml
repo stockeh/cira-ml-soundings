@@ -20,4 +20,5 @@ nwp:
   nwp_dims: 50
   time_range_minutes: 60
   path: /mnt/data1/stock/mlsoundings/rap
+  wgrib2: /home/stock/bin/grib2/wgrib2/wgrib2
 output_path: /mnt/data1/stock/mlsoundings/processed

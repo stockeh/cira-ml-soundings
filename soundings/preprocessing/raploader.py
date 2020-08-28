@@ -85,12 +85,12 @@ class RAPLoader(object):
             filename = rap_files[np.argmin(date_diffs)]
         return filename
     
-    def extract_rap_profile(self, center_lon, center_lat):
+    def extract_rap_profile(self, center_lon, center_lat, wgrib2):
         if not isinstance(center_lon, str):
             center_lon = str(center_lon)
         if not isinstance(center_lat, str):
             center_lat = str(center_lat)
-        values = subprocess.check_output(["/home/stock/bin/grib2/wgrib2/wgrib2", self.rap_file,
+        values = subprocess.check_output([wgrib2, self.rap_file,
                                           "-match",":[0-9]* hybrid level*", "-s",
                                           "-lon", center_lon, center_lat]).decode('utf-8').split('\n')[:-1]
 
