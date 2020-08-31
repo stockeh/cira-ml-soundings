@@ -194,11 +194,11 @@ class RTMALoader(object):
             np.argmin(np.abs(self.y - center_y)), self.y.shape)[0]
         center_col = np.unravel_index(
             np.argmin(np.abs(self.x - center_x)), self.x.shape)[1]
-
-        row_slice = slice(int(center_row - y_size_pixels // 2),
-                          int(center_row + y_size_pixels // 2))
-        col_slice = slice(int(center_col - x_size_pixels // 2),
-                          int(center_col + x_size_pixels // 2))
+        # Removed integer division // to allow for odd sizes images
+        row_slice = slice(int(center_row - y_size_pixels / 2),
+                          int(center_row + y_size_pixels / 2))
+        col_slice = slice(int(center_col - x_size_pixels / 2),
+                          int(center_col + x_size_pixels / 2))
         patch = np.zeros((1, self.rtma_types.size, y_size_pixels,
                           x_size_pixels), dtype=np.float32)
         for t, rtma_type in enumerate(self.rtma_types):

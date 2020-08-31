@@ -100,7 +100,10 @@ class DataHolder(object):
 
 
 def interpolate_to_height_intervals(alt, y, altitude_intervals):
-    f = interpolate.interp1d(alt, y)
+    # alititude does not always increase mononically, 
+    # however, assume_sorted if True, x has to be an array of 
+    # monotonically increasing values... 
+    f = interpolate.interp1d(alt, y, assume_sorted=True)
     return f(altitude_intervals)
 
 
@@ -111,7 +114,7 @@ def set_nwp_profile(time, lon, lat, dataset):
     except FileNotFoundError as fnfe:  # likely missing a file for all bands
         raise fnfe
     pres, temp, spec, height, rap_lon, rap_lat = rap_timestep.extract_rap_profile(lon, lat, config['nwp']['wgrib2'])
-    
+
     dataset.nwp_file = rap_timestep.rap_file
     dataset.nwp_lon = rap_lon
     dataset.nwp_lat = rap_lat
@@ -144,12 +147,9 @@ def set_radiosonde_profile(sonde, path, dataset):
 
     altitude_intervals = np.linspace(
         alt_s, config['raob']['alt_el'], config['raob']['profile_dims'])
-    print(start_indx)
-    print(t)
-    print(td)
+    np.set_printoptions(threshold=sys.maxsize)
     dataset.sonde_pres = interpolate_to_height_intervals(
         alt[start_indx:], p[start_indx:], altitude_intervals)
-    print(2)
     dataset.sonde_tdry = interpolate_to_height_intervals(
         alt[start_indx:], t[start_indx:], altitude_intervals)
     dataset.sonde_dp = interpolate_to_height_intervals(
@@ -158,7 +158,6 @@ def set_radiosonde_profile(sonde, path, dataset):
 
     dataset.sonde_file = path
     dataset.sonde_site_id = sonde.site_id
-
 
 def set_rtma_data(time, lon, lat, dataset):
     try:
@@ -180,7 +179,6 @@ def set_rtma_data(time, lon, lat, dataset):
         raise ve
         
     rtma_timestep.close()
-
 
 def set_goes_data(time, lon, lat, dataset):
     try:
@@ -215,7 +213,7 @@ def extract_all_information():
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
             path = fp.readline().rstrip('\n')
             while path:
-                if '.20200208' not in path:
+                if '.20200202' not in path:
                     path = fp.readline().rstrip('\n')
                     continue
         
@@ -246,7 +244,7 @@ def extract_all_information():
                             raise e
                     dataset.save(config['output_path'])
                 except Exception as e:
-                    print('ERROR:', e)
+                    print(f"ERROR: {path.split('/')[-1]}, {e}")
 
                 sonde.close()
                 del dataset

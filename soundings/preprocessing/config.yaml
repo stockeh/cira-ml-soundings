@@ -1,19 +1,19 @@
 goes:
   bands: [8, 9, 10, 11, 13, 14, 15, 16]
-  patch_x_length_pixels: 28
-  patch_y_length_pixels: 28
+  patch_x_length_pixels: 3
+  patch_y_length_pixels: 3
   time_range_minutes: 10
   bt: False
   path: /mnt/mlnas01/mlsoundings/goes16
 raob:
-  profile_dims: 2048
+  profile_dims: 256
   alt_el: 18000
   path: /mnt/mlnas01/mlsoundings/raobs
   valid_files_path: /mnt/data1/stock/mlsoundings/raobs/profiles-alt-files-processed.txt
 rtma:
   rtma_type: [LPI, LRI, LTI]
-  patch_x_length_pixels: 28
-  patch_y_length_pixels: 28
+  patch_x_length_pixels: 3
+  patch_y_length_pixels: 3
   time_range_minutes: 40
   path: /mnt/mlnas01/mlsoundings/rtma
 nwp:

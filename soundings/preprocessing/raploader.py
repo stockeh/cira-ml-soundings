@@ -2,6 +2,7 @@ from datetime import datetime
 from glob import glob
 from os.path import exists, join
 
+import time as cpytime
 import pandas as pd
 import numpy as np
 import pygrib
@@ -93,7 +94,6 @@ class RAPLoader(object):
         values = subprocess.check_output([wgrib2, self.rap_file,
                                           "-match",":[0-9]* hybrid level*", "-s",
                                           "-lon", center_lon, center_lat]).decode('utf-8').split('\n')[:-1]
-
         pres = np.zeros(50)
         temp = np.zeros(50)
         spec = np.zeros(50)

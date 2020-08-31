@@ -226,12 +226,14 @@ class GOES16ABI(object):
         center_x, center_y = self.proj(center_lon, center_lat)
         center_row = np.argmin(np.abs(self.y - center_y))
         center_col = np.argmin(np.abs(self.x - center_x))
-        row_slice = slice(int(center_row - y_size_pixels // 2),
-                          int(center_row + y_size_pixels // 2))
-        col_slice = slice(int(center_col - x_size_pixels // 2),
-                          int(center_col + x_size_pixels // 2))
+        # Removed integer division // to allow for odd sizes images
+        row_slice = slice(int(center_row - y_size_pixels / 2),
+                          int(center_row + y_size_pixels / 2))
+        col_slice = slice(int(center_col - x_size_pixels / 2),
+                          int(center_col + x_size_pixels / 2))
         patch = np.zeros((1, self.bands.size, y_size_pixels,
                           x_size_pixels), dtype=np.float32)
+        
         for b, band in enumerate(self.bands):
             """
             Converting Spectral Radiance to BT (bands 7-16)
