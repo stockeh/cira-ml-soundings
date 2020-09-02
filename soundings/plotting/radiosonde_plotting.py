@@ -38,7 +38,7 @@ DEFAULT_OPTION_DICT = {
     MAIN_LINE_COLOUR_KEY: numpy.array([0, 0, 0], dtype=float),
     PREDICTED_LINE_COLOUR_KEY: numpy.array([44, 114, 230], dtype=float) / 255,
     NWP_LINE_COLOUR_KEY: numpy.array([162, 20, 47], dtype=float) / 255,
-    MAIN_LINE_WIDTH_KEY: 3,
+    MAIN_LINE_WIDTH_KEY: 4,
     DRY_ADIABAT_COLOUR_KEY: numpy.array([217, 95, 2], dtype=float) / 255,
     MOIST_ADIABAT_COLOUR_KEY: numpy.array([117, 112, 179], dtype=float) / 255,
     ISOHUME_COLOUR_KEY: numpy.array([27, 158, 119], dtype=float) / 255,
@@ -58,6 +58,7 @@ def _init_save_img(option_dict):
     option_dict[TITLE_FONT_SIZE] = 25
     option_dict[FIGURE_WIDTH_KEY] = 15
     option_dict[FIGURE_HEIGHT_KEY] = 15
+    option_dict[MAIN_LINE_WIDTH_KEY] = 5
 
 def colour_from_numpy_to_tuple(input_colour):
     """Converts colour from numpy array to tuple (if necessary).
@@ -311,7 +312,7 @@ def plot_nwp_ml_sounding(sounding_dict, title_string=None, option_dict=None, fil
     metpy.units.units.degC
 
     nwp_line_colour = option_dict[NWP_LINE_COLOUR_KEY]
-    main_line_width = option_dict[MAIN_LINE_WIDTH_KEY] / 1.85
+    main_line_width = option_dict[MAIN_LINE_WIDTH_KEY] / 1.4
     skewt_object.plot(
         pressure, nwp_temperatures_deg_c,
         color=colour_from_numpy_to_tuple(nwp_line_colour),
@@ -322,7 +323,7 @@ def plot_nwp_ml_sounding(sounding_dict, title_string=None, option_dict=None, fil
         metpy.units.units.degC
     
     predicted_line_colour = option_dict[PREDICTED_LINE_COLOUR_KEY]
-    main_line_width = option_dict[MAIN_LINE_WIDTH_KEY] / 1.85
+    main_line_width = option_dict[MAIN_LINE_WIDTH_KEY] / 1.4
     skewt_object.plot(
         pressure, predicted_temperatures_deg_c,
         color=colour_from_numpy_to_tuple(predicted_line_colour),

@@ -13,12 +13,8 @@ class GOESNeuralNetwork():
         assert ((len(n_goes_inputs) == 3) and 
                 n_goes_inputs[-1] < n_goes_inputs[0]), 'GOES must be HxWxC dimensions'
         
-        if seed:
-            self.seed = seed
-            np.random.seed(seed)
-            random.seed(seed)
-            tf.random.set_seed(seed)
-                  
+        self.seed = seed
+        self._set_seed()
         tf.keras.backend.clear_session()
 
         self.n_goes_inputs = n_goes_inputs
@@ -62,6 +58,12 @@ class GOESNeuralNetwork():
         else:
             str += '  Network is not trained.'
         return str
+    
+    def _set_seed(self):
+        if self.seed:
+            np.random.seed(self.seed)
+            random.seed(self.seed)
+            tf.random.set_seed(self.seed)
 
     def _setup_standardize(self, goes, rap, raob):
         if self.GOESmeans is None:
@@ -112,7 +114,8 @@ class GOESNeuralNetwork():
     def train(self, goes, rap, raob, n_epochs, batch_size, method='sgd',
               verbose=False, learning_rate=0.001, validation=None, loss_f=None):
         """Use Keras Functional API to train model"""
-
+        
+        self._set_seed()
         self._setup_standardize(goes, rap, raob)
         
         goes = self._standardizeGOES(goes)

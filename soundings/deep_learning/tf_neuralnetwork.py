@@ -28,7 +28,7 @@ class NeuralNetwork():
                 f'{type(self).__name__}: n_hiddens_list must be a list.')
 
         self.seed = seed
-        self.set_seed()
+        self._set_seed()
         tf.keras.backend.clear_session()
 
         self.n_inputs = n_inputs
@@ -127,7 +127,6 @@ class NeuralNetwork():
         loss = tf.keras.losses.MSE if loss_f == None else loss_f
         self.model.compile(optimizer=algo, loss=loss,
                            metrics=[tf.keras.metrics.RootMeanSquaredError()])
-
         callback = [callbacks.TrainLogger(n_epochs, step=5)] if verbose else None
         start_time = time.time()
         self.history = self.model.fit(X, T, batch_size=batch_size, epochs=n_epochs,
@@ -164,12 +163,8 @@ class ConvolutionalNeuralNetwork(NeuralNetwork):
             raise Exception(
                 f'{type(self).__name__}: kernels_size_and_stride must be a list.')
 
-        if seed:
-            self.seed = seed
-            np.random.seed(seed)
-            random.seed(seed)
-            tf.random.set_seed(seed)
-                  
+        self.seed = seed
+        self._set_seed()
         tf.keras.backend.clear_session()
 
         self.n_inputs = n_inputs
@@ -220,12 +215,8 @@ class ConvolutionalAutoEncoder(NeuralNetwork):
             raise Exception(
                 f'{type(self).__name__}: kernels_size_and_stride must be a list.')
 
-        if seed:
-            self.seed = seed
-            np.random.seed(seed)
-            random.seed(seed)
-            tf.random.set_seed(seed)
-                  
+        self.seed = seed
+        self._set_seed()
         tf.keras.backend.clear_session()
 
         self.n_inputs = n_inputs
