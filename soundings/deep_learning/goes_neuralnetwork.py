@@ -9,10 +9,14 @@ from soundings.deep_learning import callbacks
 
 
 class GOESNeuralNetwork():
-    def __init__(self, n_goes_inputs, n_rap_inputs, goes_hiddens_list, n_outputs, activation='tanh', seed=None):
+    def __init__(self, n_goes_inputs, n_rap_inputs, goes_hiddens_list, 
+                 n_units_in_conv_layers, kernels_size_and_stride,
+                 n_outputs, goes_activation='tanh', rap_activation='relu', seed=None):
         
         assert ((len(n_goes_inputs) == 3)), f'GOES must be HxWxC dimensions, {n_goes_inputs}'
         assert (isinstance(goes_hiddens_list, list)), f'{type(self).__name__}: goes_hiddens_list must be a list.'
+        assert (isinstance(goes_hiddens_list, list)), f'{type(self).__name__}: n_units_in_conv_layers must be a list.'
+        assert (isinstance(kernels_size_and_stride, list)), f'{type(self).__name__}: kernels_size_and_stride must be a list.'
         
         self.seed = seed
         self._set_seed()
@@ -21,30 +25,39 @@ class GOESNeuralNetwork():
         self.n_goes_inputs = n_goes_inputs
         self.n_rap_inputs = n_rap_inputs
         self.goes_hiddens_list = goes_hiddens_list
+        self.n_units_in_conv_layers = n_units_in_conv_layers
+        self.kernels_size_and_stride = kernels_size_and_stride
         self.n_outputs = n_outputs
         
         X1 = tf.keras.Input(shape=n_goes_inputs, name='goes')
         
         Z = tf.keras.layers.Flatten()(X1)
-        for units in goes_hiddens_list:
-            Z = tf.keras.layers.Dense(units, activation=activation)(Z)
+        for units in goes_hiddens_list[:-1]:
+            Z = tf.keras.layers.Dense(units, activation=goes_activation)(Z)
             
-        def pad_upper_zeros(z):
-            """Pad `n_rap_inputs`-previous units zeros to every tensor in the batch.
-            This isolates the information only near the surface.
+        Z = tf.keras.layers.Dense(goes_hiddens_list[-1])(Z)
+        
+        def _pad_upper_zeros(z):
+            """Pad `n_rap_inputs` minus the previous unit outputs with zeros to every 
+            tensor in the batch. This isolates the information only near the surface.
             """
             prev_units = n_rap_inputs[0] - z.shape[1]
             zeros =  tf.expand_dims(tf.zeros(prev_units), axis=0)
             repeat = tf.squeeze(tf.keras.layers.RepeatVector(tf.shape(z)[0])(zeros), axis=0)
             return tf.expand_dims(tf.concat([z, repeat], axis=1), axis=-1)
      
-        out = tf.keras.layers.Lambda(pad_upper_zeros)(Z)
+        # pad with zeros to match rap input
+        out = tf.keras.layers.Lambda(_pad_upper_zeros)(Z)
+        # out = tf.expand_dims(tf.keras.layers.Dense(256)(Z), axis=-1)
         
         X2 = tf.keras.Input(shape=n_rap_inputs, name='rap')
         Z = tf.keras.layers.Concatenate(axis=2)([X2, out])
 
-        Z = tf.keras.layers.Conv1D(16, kernel_size=10, strides=1, activation='tanh', padding='same')(Z)
-        Z = tf.keras.layers.MaxPooling1D(pool_size=2)(Z)
+        for (kernel, stride), units in zip(kernels_size_and_stride, n_units_in_conv_layers):
+            Z = tf.keras.layers.Conv1D(units, kernel_size=kernel, strides=stride,
+                                       activation=rap_activation, padding='same')(Z)
+            Z = tf.keras.layers.MaxPooling1D(pool_size=2)(Z)
+        
         Y = tf.keras.layers.Dense(n_outputs, name='out')(tf.keras.layers.Flatten()(Z))
         self.model = tf.keras.Model(inputs=[X1, X2], outputs=Y)
         
