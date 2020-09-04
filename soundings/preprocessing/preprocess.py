@@ -213,7 +213,7 @@ def extract_all_information():
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
             path = fp.readline().rstrip('\n')
             while path:
-                if '.202004' not in path:
+                if '.202006' not in path:
                     path = fp.readline().rstrip('\n')
                     continue
         
