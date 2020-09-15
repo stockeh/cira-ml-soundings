@@ -35,13 +35,13 @@ class NeuralNetwork():
         self.n_hiddens_list = n_hiddens_list
         self.n_outputs = n_outputs
 
-        X = tf.keras.Input(shape=(n_inputs,))
-        Z = X
+        X = Z = tf.keras.Input(shape=(n_inputs,))
         if not (n_hiddens_list == [] or n_hiddens_list == [0]):
             for i, units in enumerate(n_hiddens_list):
-                Z = tf.keras.layers.Dense(units, activation=activation)(Z)
-                if i % 2 == 0:
-                    Z = tf.keras.layers.BatchNormalization()(Z)
+                Z = tf.keras.layers.Dense(units)(Z)
+                Z = tf.keras.layers.BatchNormalization()(Z)                    
+                Z = tf.keras.layers.Activation(activation)(Z)
+                Z = tf.keras.layers.Dropout(0.2)(Z)
         Y = tf.keras.layers.Dense(n_outputs)(Z)
         self.model = tf.keras.Model(inputs=X, outputs=Y)
 
@@ -120,6 +120,12 @@ class NeuralNetwork():
                 algo = tf.keras.optimizers.SGD(learning_rate=learning_rate)
             elif method == 'adam':
                 algo = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+            elif method == 'Adagrad':
+                algo = tf.keras.optimizers.Adagrad(learning_rate=learning_rate)
+            elif method == 'RMSprop':
+                algo = tf.keras.optimizers.RMSprop(learning_rate=learning_rate)
+            elif method == 'Adadelta':
+                algo = tf.keras.optimizers.Adadelta(learning_rate=learning_rate)
         except:
             raise Exception(
                 "train: method={method} not one of 'scg' or 'adam'")
