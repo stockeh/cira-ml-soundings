@@ -8,7 +8,7 @@ import numpy as np
 import tensorflow as tf
 
 from soundings.deep_learning import callbacks
-
+from soundings.deep_learning import tf_metrics as metrics
 
 def loadnn(path):
     try:
@@ -132,7 +132,8 @@ class NeuralNetwork():
 
         loss = tf.keras.losses.MSE if loss_f == None else loss_f
         self.model.compile(optimizer=algo, loss=loss,
-                           metrics=[tf.keras.metrics.RootMeanSquaredError()])
+                           metrics=[metrics.RMSE(self._unstandardizeT),
+                                    metrics.SurfaceRMSE(self._unstandardizeT)])
         callback = [callbacks.TrainLogger(n_epochs, step=5)] if verbose else None
         start_time = time.time()
         self.history = self.model.fit(X, T, batch_size=batch_size, epochs=n_epochs,
@@ -275,6 +276,87 @@ class ConvolutionalAutoEncoder(NeuralNetwork):
         else:
             str += '  Network is not trained.'
         return str
+    
+    
+    
+class SkipNeuralNetwork(NeuralNetwork):
+    def __init__(self, n_inputs, n_units_in_conv_layers,
+                 kernels_size_and_stride, n_outputs, activation='relu', n_hidden_dims=100, seed=None):
+
+        if not isinstance(n_units_in_conv_layers, (list, tuple)):
+            raise Exception(
+                f'{type(self).__name__}: n_units_in_conv_layers must be a list.')
+
+        if not isinstance(kernels_size_and_stride, list):
+            raise Exception(
+                f'{type(self).__name__}: kernels_size_and_stride must be a list.')
+
+        self.seed = seed
+        self._set_seed()
+        tf.keras.backend.clear_session()
+
+        self.n_inputs = n_inputs
+        self.n_units_in_conv_layers = n_units_in_conv_layers
+        self.kernels_size_and_stride = kernels_size_and_stride
+        self.n_outputs = n_outputs
+        self.n_hidden_dim = n_hidden_dims
+
+        # encoder
+        X = Z = tf.keras.Input(shape=n_inputs)
+        
+        for (kernel, stride), units in zip(kernels_size_and_stride, n_units_in_conv_layers):
+            Z = tf.keras.layers.Conv1D(
+                units, kernel_size=kernel, strides=stride, padding='same')(Z)
+            Z = tf.keras.layers.BatchNormalization()(Z)                    
+            Z = tf.keras.layers.Activation(activation)(Z)
+            Z = tf.keras.layers.MaxPooling1D(pool_size=2)(Z)
+       
+        encoder = tf.keras.Model(X, Z)
+        skips = list(reversed([layer for layer in encoder.layers if 'max' in layer.name]))
+        # latent vector
+        conv_shape = Z.shape[1:]
+        F = tf.keras.layers.Flatten()(Z)
+        Z = tf.keras.layers.Dropout(0.50)(Z)
+        Z = tf.keras.layers.Dense(n_hidden_dims, activation='tanh')(F)
+        
+        # decoder (input of `n_hidden_dim`)
+        Z = tf.keras.layers.Dropout(0.50)(Z)
+        Z = tf.keras.layers.Dense(F.shape[1], activation='tanh')(Z)
+        Z = tf.keras.layers.Reshape(conv_shape)(Z)
+        for (kernel, stride), units, skip in zip(reversed(kernels_size_and_stride),
+                                                 reversed(n_units_in_conv_layers),
+                                                 skips):
+            # print(Z.shape, skip.output.shape)
+            Z = tf.keras.layers.Concatenate()([Z, skip.output])
+            Z = tf.keras.layers.Conv1D(
+                units, kernel_size=kernel, strides=stride, padding='same')(Z)
+            Z = tf.keras.layers.BatchNormalization()(Z)                    
+            Z = tf.keras.layers.Activation(activation)(Z)
+            Z = tf.keras.layers.UpSampling1D(size=2)(Z)
+            
+        Z = tf.keras.layers.Conv1D(
+            1, kernel_size=kernels_size_and_stride[0][0], strides=kernels_size_and_stride[0][1],
+            activation=activation, padding='same')(Z)      
+
+        Y = tf.keras.layers.Dense(n_inputs[0])(tf.keras.layers.Flatten()(Z))
+        self.model = tf.keras.Model(inputs=X, outputs=Y)
+
+        self.Xmeans = None
+        self.Xstds = None
+        self.Tmeans = None
+        self.Tstds = None
+
+        self.history = None
+        self.training_time = None
+
+    def __repr__(self):
+        str = f'{type(self).__name__}({self.n_inputs}, {self.n_units_in_conv_layers}, {self.kernels_size_and_stride}, {self.n_outputs})'
+        if self.history:
+            str += f"\n  Final objective value is {self.history['loss'][-1]:.5f} in {self.training_time:.4f} seconds."
+        else:
+            str += '  Network is not trained.'
+        return str
+    
     
 
 class MultiNeuralNetwork():
