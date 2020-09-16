@@ -4,6 +4,7 @@ import time
 import random
 import pickle
 
+import os
 import numpy as np
 import tensorflow as tf
 
@@ -14,7 +15,8 @@ def loadnn(path):
     try:
         with open(path + '/class.pickle', 'rb') as f:
             c = pickle.load(f)
-        c.model = tf.keras.models.load_model(path)
+        tf_model_path = os.path.join(path, 'model.h5')
+        c.model = tf.keras.models.load_model(tf_model_path)
         return c
     except Exception as e:
         print(e)
@@ -131,10 +133,11 @@ class NeuralNetwork():
                 "train: method={method} not one of 'scg' or 'adam'")
 
         loss = tf.keras.losses.MSE if loss_f == None else loss_f
+        
         self.model.compile(optimizer=algo, loss=loss,
-                           metrics=[metrics.RMSE(self._unstandardizeT),
-                                    metrics.SurfaceRMSE(self._unstandardizeT)])
-        callback = [callbacks.TrainLogger(n_epochs, step=5)] if verbose else None
+                           metrics=[tf.keras.metrics.RootMeanSquaredError(),
+                                    metrics.wrapper_mse(self._unstandardizeT)])
+        callback = [callbacks.TrainLogger(n_epochs, step=1)] if verbose else None
         start_time = time.time()
         self.history = self.model.fit(X, T, batch_size=batch_size, epochs=n_epochs,
                                       verbose=0, callbacks=callback,
@@ -150,14 +153,16 @@ class NeuralNetwork():
         return Y
     
     def save(self, path):
-        self.model.save(path)
+        tf_model_path = os.path.join(path, 'model.h5')
+        if not os.path.exists(path):
+            os.makedirs(path)
+        self.model.save(tf_model_path)
         del self.model
-        with open(path + '/class.pickle', 'wb') as f:
+        with open(os.path.join(path, 'class.pickle'), 'wb') as f:
             pickle.dump(self, f)
-        self.model = tf.keras.models.load_model(path)
+        self.model = tf.keras.models.load_model(tf_model_path)
   
     
-
 class ConvolutionalNeuralNetwork(NeuralNetwork):
     def __init__(self, n_inputs, n_units_in_conv_layers,
                  kernels_size_and_stride, n_outputs, activation='tanh', seed=None):
