@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-def wrapper_truncated_mse(_unstandardizeT, sfc_boundary=25):
+def unstd_truncated_mse(_unstandardizeT, sfc_boundary=25):
     def truncated_mse(y_pred, y_true):
         y_pred = _unstandardizeT(y_pred)[:,:sfc_boundary]
         y_true = _unstandardizeT(y_true)[:,:sfc_boundary]
@@ -8,7 +8,7 @@ def wrapper_truncated_mse(_unstandardizeT, sfc_boundary=25):
     return truncated_mse
 
 
-def wrapper_mse(_unstandardizeT):
+def unstd_mse(_unstandardizeT):
     def mse(y_pred, y_true):
         y_pred = _unstandardizeT(y_pred)
         y_true = _unstandardizeT(y_true)

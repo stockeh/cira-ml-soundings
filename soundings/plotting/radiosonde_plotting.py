@@ -187,16 +187,15 @@ def plot_sounding(sounding_dict, title_string=None, option_dict=None, file_name=
         skewt_object.plot(
             pressure, temperature,
             color=colour_from_numpy_to_tuple(option_dict[MAIN_LINE_COLOUR_KEY]),
-            linewidth=main_line_width, linestyle='solid'
+            linewidth=main_line_width, linestyle='solid', label='RAOB'
         )
     except KeyError:
         pass
-
     try:
         dewpoint = radiosonde_utils.convert_metpy_dewpoint(sounding_dict)
         skewt_object.plot(
             pressure, dewpoint,
-            color=colour_from_numpy_to_tuple(option_dict[PREDICTED_LINE_COLOUR_KEY]),
+            color=colour_from_numpy_to_tuple(option_dict[MAIN_LINE_COLOUR_KEY]),
             linewidth=main_line_width, linestyle='solid'
         )
     except KeyError:
@@ -262,10 +261,10 @@ def plot_predicted_sounding(sounding_dict, title_string=None, option_dict=None, 
     skewt_object.plot(
         pressure, predicted_temperatures_deg_c,
         color=colour_from_numpy_to_tuple(predicted_line_colour),
-        linewidth=main_line_width, linestyle='solid'
+        linewidth=main_line_width, linestyle='solid', label='ML'
     )
 
-    pyplot.legend(('T', 'Y'), fontsize=option_dict[DEFAULT_FONT_SIZE])
+    pyplot.legend(fontsize=option_dict[DEFAULT_FONT_SIZE])
     
     if file_name:
         pyplot.savefig(file_name, dpi=option_dict[DOTS_PER_INCH])
@@ -282,8 +281,10 @@ def plot_nwp_ml_sounding(sounding_dict, title_string=None, option_dict=None, fil
     :params
     ---
         sounding_dict : dict
-            The following keys: pressures_mb, temperatures_deg_c, dewpoints_deg_c
-            predicted_temperature_c
+            The following keys: 
+            RAOB: pressures_mb, temperatures_deg_c, dewpoints_deg_c
+            NWP: nwp_temperatures_deg_c, nwp_dewpoints_deg_c
+            ML: predicted_temperature_deg_c, predicted_dewpoints_deg_c
         title_string : str
         option_dict : dict
         file_name : str
@@ -308,29 +309,60 @@ def plot_nwp_ml_sounding(sounding_dict, title_string=None, option_dict=None, fil
         sounding_dict, title_string, option_dict)
     
     pressure = radiosonde_utils.convert_metpy_pressure(sounding_dict)
-    nwp_temperatures_deg_c = sounding_dict[radiosonde_utils.NWP_TEMPERATURE_COLUMN_KEY] * \
-    metpy.units.units.degC
-
+    
     nwp_line_colour = option_dict[NWP_LINE_COLOUR_KEY]
-    main_line_width = option_dict[MAIN_LINE_WIDTH_KEY] / 1.4
-    skewt_object.plot(
-        pressure, nwp_temperatures_deg_c,
-        color=colour_from_numpy_to_tuple(nwp_line_colour),
-        linewidth=main_line_width, linestyle='solid'
-    )
-    
-    predicted_temperatures_deg_c = sounding_dict[radiosonde_utils.PREDICTED_TEMPERATURE_COLUMN_KEY] * \
-        metpy.units.units.degC
-    
     predicted_line_colour = option_dict[PREDICTED_LINE_COLOUR_KEY]
     main_line_width = option_dict[MAIN_LINE_WIDTH_KEY] / 1.4
-    skewt_object.plot(
-        pressure, predicted_temperatures_deg_c,
-        color=colour_from_numpy_to_tuple(predicted_line_colour),
-        linewidth=main_line_width, linestyle='solid'
-    )
 
-    pyplot.legend(('RAOB', 'NWP', 'ML'), fontsize=option_dict[DEFAULT_FONT_SIZE])
+    try:
+        nwp_temperatures_deg_c = sounding_dict[radiosonde_utils.NWP_TEMPERATURE_COLUMN_KEY] * \
+            metpy.units.units.degC
+
+        skewt_object.plot(
+            pressure, nwp_temperatures_deg_c,
+            color=colour_from_numpy_to_tuple(nwp_line_colour),
+            linewidth=main_line_width, linestyle='solid', label='RAP'
+        )
+    except KeyError:
+        pass
+    
+    try: 
+        predicted_temperatures_deg_c = sounding_dict[radiosonde_utils.PREDICTED_TEMPERATURE_COLUMN_KEY] * \
+            metpy.units.units.degC
+
+        skewt_object.plot(
+            pressure, predicted_temperatures_deg_c,
+            color=colour_from_numpy_to_tuple(predicted_line_colour),
+            linewidth=main_line_width, linestyle='solid', label='ML'
+        )
+    except KeyError:
+        pass
+    
+    pyplot.legend(fontsize=option_dict[DEFAULT_FONT_SIZE])
+    
+    try:
+        nwp_dewpoint_deg_c = sounding_dict[radiosonde_utils.NWP_DEWPOINT_COLUMN_KEY] * \
+            metpy.units.units.degC
+
+        skewt_object.plot(
+            pressure, nwp_dewpoint_deg_c,
+            color=colour_from_numpy_to_tuple(nwp_line_colour),
+            linewidth=main_line_width, linestyle='solid'
+        )
+    except KeyError:
+        pass
+    
+    try: 
+        predicted_dewpoint_deg_c = sounding_dict[radiosonde_utils.PREDICTED_DEWPOINT_COLUMN_KEY] * \
+            metpy.units.units.degC
+
+        skewt_object.plot(
+            pressure, predicted_dewpoint_deg_c,
+            color=colour_from_numpy_to_tuple(predicted_line_colour),
+            linewidth=main_line_width, linestyle='solid'
+        )
+    except KeyError:
+        pass
     
     if file_name:
         pyplot.savefig(file_name, dpi=option_dict[DOTS_PER_INCH])
