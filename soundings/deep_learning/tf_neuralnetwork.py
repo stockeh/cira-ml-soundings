@@ -44,9 +44,9 @@ class NeuralNetwork():
         if not (n_hiddens_list == [] or n_hiddens_list == [0]):
             for i, units in enumerate(n_hiddens_list):
                 Z = tf.keras.layers.Dense(units)(Z)
-                Z = tf.keras.layers.BatchNormalization()(Z)                    
+                # Z = tf.keras.layers.BatchNormalization()(Z)                    
                 Z = tf.keras.layers.Activation(activation)(Z)
-                Z = tf.keras.layers.Dropout(0.2)(Z)
+                # Z = tf.keras.layers.Dropout(0.2)(Z)
         Y = tf.keras.layers.Dense(n_outputs)(Z)
         self.model = tf.keras.Model(inputs=X, outputs=Y)
 
@@ -141,7 +141,10 @@ class NeuralNetwork():
                            metrics=[metrics.unstd_mse(self._unstandardizeT),
                                     metrics.unstd_truncated_mse(self._unstandardizeT),
                                     metrics.unstd_rmse(self._unstandardizeT)])
-        callback = [callbacks.TrainLogger(n_epochs, step=5)] if verbose else None
+        callback = [tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=1e-4, patience=10)]
+        if verbose:
+            callback.append(callbacks.TrainLogger(n_epochs, step=5))
+            
         start_time = time.time()
         self.history = self.model.fit(X, T, batch_size=batch_size, epochs=n_epochs,
                                       verbose=0, callbacks=callback,

@@ -1,3 +1,4 @@
+import copy
 import numpy as np
 import matplotlib.pyplot as plt
 from soundings.deep_learning import mlutilities as ml
@@ -39,6 +40,9 @@ def plot_altitude_rmse_verticle(nnet, X, T, NWP_Temp, alt, file_name=None):
     fig, axs = plt.subplots(1, 2, figsize=(figure_width, figure_height))
     axs = axs.ravel()
     
+    # !!! Added for difference between RAP and RAOB
+    # T = copy.copy(T) + NWP_Temp
+    
     rap_rmse = np.sqrt((np.mean((NWP_Temp - T)**2, axis=0)))
     rap_mean_rmse = ml.rmse(NWP_Temp, T)
     
@@ -53,6 +57,8 @@ def plot_altitude_rmse_verticle(nnet, X, T, NWP_Temp, alt, file_name=None):
     axs[1].axvline(rap_mean_rmse, label=f'RAP: {rap_mean_rmse:.3f}',
                    color=rap_color, linestyle='--', linewidth=line_width)
     
+    # !!! Added for difference between RAP and RAOB
+    # Y = nnet.use(X) + NWP_Temp
     Y = nnet.use(X)
     ml_rmse = np.sqrt((np.mean((Y - T)**2, axis=0)))
     ml_mean_rmse = ml.rmse(Y, T)
