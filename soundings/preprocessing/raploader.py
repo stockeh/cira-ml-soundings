@@ -86,33 +86,61 @@ class RAPLoader(object):
             filename = rap_files[np.argmin(date_diffs)]
         return filename
     
-    def extract_rap_profile(self, center_lon, center_lat, wgrib2):
-        if not isinstance(center_lon, str):
-            center_lon = str(center_lon)
-        if not isinstance(center_lat, str):
-            center_lat = str(center_lat)
-        values = subprocess.check_output([wgrib2, self.rap_file,
-                                          "-match",":[0-9]* hybrid level*", "-s",
-                                          "-lon", center_lon, center_lat]).decode('utf-8').split('\n')[:-1]
-        pres = np.zeros(50)
-        temp = np.zeros(50)
-        spec = np.zeros(50)
-        height = np.zeros(50)
-
-        lon = float(values[0][values[0].find('lon=') + len('lon='):values[0].find('lat=') - 1])
-        lat = float(values[0][values[0].find('lat=') + len('lat='):values[0].find('val=') - 1])
-
+    def extract_rap_profile(self, locations, wgrib2):
+        """
+        :params
+        ---
+        locations : array
+            [(center_lon, center_lat), ...]
+        """
+        command = [wgrib2, self.rap_file, "-match", ":[0-9]* hybrid level*", "-s"]
+        
+        for (center_lon, center_lat) in locations:
+            if not isinstance(center_lon, str):
+                center_lon = str(center_lon)
+            if not isinstance(center_lat, str):
+                center_lat = str(center_lat)
+            command.extend(["-lon", center_lon, center_lat]) 
+            
+        values = subprocess.check_output(command).decode('utf-8').split('\n')[:-1]
+        
+        pres = np.zeros((len(locations), 50))
+        temp = np.zeros((len(locations), 50))
+        spec = np.zeros((len(locations), 50))
+        height = np.zeros((len(locations), 50))
+        
+        lons = np.zeros((len(locations), 1))
+        lats = np.zeros((len(locations), 1))
+        
         for line in values:
             items = line.split(':')
             index = int(items[4].split('hybrid level')[0]) - 1
-            value = float(items[-1].split('val=')[-1])
-            if items[3] == 'PRES':
-                pres[index] = value
-            if items[3] == 'HGT':
-                height[index] = value
-            if items[3] == 'TMP':
-                temp[index] = value
-            if items[3] == 'SPFH':
-                spec[index] = value
 
-        return pres, temp, spec, height, lon, lat
+            for l, loc in enumerate(items[7:]):
+                
+                if lons[l, 0] == 0:
+                    lons[l, 0] = float(loc[loc.find('lon=') + len('lon='):loc.find('lat=') - 1])
+                    lats[l, 0] = float(loc[loc.find('lat=') + len('lat='):loc.find('val=') - 1])
+
+                value = float(loc.split('val=')[-1])
+                identifier = items[3]
+                
+                if identifier == 'PRES':
+                    pres[l, index] = value
+                if identifier == 'HGT':
+                    height[l, index] = value
+                if identifier == 'TMP':
+                    temp[l, index] = value
+                if identifier == 'SPFH':
+                    spec[l, index] = value
+
+        # implemented to be backwards compatable
+        if len(locations) == 1:
+            pres = pres.flatten()
+            temp = temp.flatten()
+            spec = spec.flatten()
+            height = height.flatten()
+            lons = lons.flatten()
+            lats = lats.flatten()
+        
+        return pres, temp, spec, height, lons, lats

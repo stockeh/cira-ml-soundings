@@ -23,7 +23,7 @@ def loadnn(path):
         return c
     except Exception as e:
         raise e
-        
+
 
 class NeuralNetwork():
     def __init__(self, n_inputs, n_hiddens_list, n_outputs, activation='tanh', seed=None):
@@ -44,7 +44,7 @@ class NeuralNetwork():
         if not (n_hiddens_list == [] or n_hiddens_list == [0]):
             for i, units in enumerate(n_hiddens_list):
                 Z = tf.keras.layers.Dense(units)(Z)
-                # Z = tf.keras.layers.BatchNormalization()(Z)                    
+                # Z = tf.keras.layers.BatchNormalization()(Z)
                 Z = tf.keras.layers.Activation(activation)(Z)
                 # Z = tf.keras.layers.Dropout(0.2)(Z)
         Y = tf.keras.layers.Dense(n_outputs)(Z)
@@ -65,7 +65,7 @@ class NeuralNetwork():
         else:
             str += '  Network is not trained.'
         return str
-    
+
     def _set_seed(self):
         if self.seed:
             np.random.seed(self.seed)
@@ -119,7 +119,7 @@ class NeuralNetwork():
             except:
                 raise TypeError(
                     f'validation must be of the following shape: (X, T)')
-                
+
         try:
             if method == 'sgd':
                 algo = tf.keras.optimizers.SGD(learning_rate=learning_rate)
@@ -136,7 +136,7 @@ class NeuralNetwork():
                 "train: method={method} not one of 'scg' or 'adam'")
 
         loss = tf.keras.losses.MSE if loss_f == None else loss_f
-        
+
         self.model.compile(optimizer=algo, loss=loss,
                            metrics=[metrics.unstd_mse(self._unstandardizeT),
                                     metrics.unstd_truncated_mse(self._unstandardizeT),
@@ -144,7 +144,7 @@ class NeuralNetwork():
         callback = [tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=1e-4, patience=10)]
         if verbose:
             callback.append(callbacks.TrainLogger(n_epochs, step=5))
-            
+
         start_time = time.time()
         self.history = self.model.fit(X, T, batch_size=batch_size, epochs=n_epochs,
                                       verbose=0, callbacks=callback,
@@ -158,7 +158,7 @@ class NeuralNetwork():
         X = self._standardizeX(X)
         Y = self._unstandardizeT(self.model.predict(X))
         return Y
-    
+
     def save(self, path):
         tf_model_path = os.path.join(path, 'model.h5')
         if not os.path.exists(path):
@@ -167,12 +167,12 @@ class NeuralNetwork():
         del self.model
         with open(os.path.join(path, 'class.pickle'), 'wb') as f:
             pickle.dump(self, f)
-        self.model = tf.keras.models.load_model(tf_model_path, 
+        self.model = tf.keras.models.load_model(tf_model_path,
                custom_objects={'rmse': metrics.unstd_rmse(self._unstandardizeT),
                                'mse': metrics.unstd_mse(self._unstandardizeT),
                                'truncated_mse': metrics.unstd_truncated_mse(self._unstandardizeT)})
-  
-    
+
+
 class ConvolutionalNeuralNetwork(NeuralNetwork):
     def __init__(self, n_inputs, n_units_in_conv_layers,
                  kernels_size_and_stride, n_outputs, activation='tanh',
@@ -272,10 +272,10 @@ class ConvolutionalAutoEncoder(NeuralNetwork):
                 units, kernel_size=kernel, strides=stride, activation=activation, padding='same')(Z)
             Z = tf.keras.layers.UpSampling1D(size=2)(Z)
             if dropout:
-                Z = tf.keras.layers.Dropout(0.20)(Z)      
+                Z = tf.keras.layers.Dropout(0.20)(Z)
         Z = tf.keras.layers.Conv1D(
             1, kernel_size=kernels_size_and_stride[0][0], strides=kernels_size_and_stride[0][1],
-            activation=activation, padding='same')(Z)      
+            activation=activation, padding='same')(Z)
         if dropout:
             Z = tf.keras.layers.Dropout(0.20)(Z)
         Y = tf.keras.layers.Dense(n_inputs[0])(tf.keras.layers.Flatten()(Z))
@@ -296,9 +296,9 @@ class ConvolutionalAutoEncoder(NeuralNetwork):
         else:
             str += '  Network is not trained.'
         return str
-    
-    
-    
+
+
+
 class SkipNeuralNetwork(NeuralNetwork):
     def __init__(self, n_inputs, n_units_in_conv_layers,
                  kernels_size_and_stride, n_outputs, activation='relu', n_hidden_dims=100, seed=None):
@@ -323,14 +323,14 @@ class SkipNeuralNetwork(NeuralNetwork):
 
         # encoder
         X = Z = tf.keras.Input(shape=n_inputs)
-        
+
         for (kernel, stride), units in zip(kernels_size_and_stride, n_units_in_conv_layers):
             Z = tf.keras.layers.Conv1D(
                 units, kernel_size=kernel, strides=stride, padding='same')(Z)
-            # Z = tf.keras.layers.BatchNormalization()(Z)                    
+            # Z = tf.keras.layers.BatchNormalization()(Z)
             Z = tf.keras.layers.Activation(activation)(Z)
             Z = tf.keras.layers.MaxPooling1D(pool_size=2)(Z)
-       
+
         encoder = tf.keras.Model(X, Z)
         skips = list(reversed([layer for layer in encoder.layers if 'max' in layer.name]))
         # latent vector
@@ -338,7 +338,7 @@ class SkipNeuralNetwork(NeuralNetwork):
         F = tf.keras.layers.Flatten()(Z)
         # Z = tf.keras.layers.Dropout(0.50)(Z)
         Z = tf.keras.layers.Dense(n_hidden_dims, activation='tanh')(F)
-        
+
         # decoder (input of `n_hidden_dim`)
         # Z = tf.keras.layers.Dropout(0.50)(Z)
         Z = tf.keras.layers.Dense(F.shape[1], activation='tanh')(Z)
@@ -350,13 +350,13 @@ class SkipNeuralNetwork(NeuralNetwork):
             Z = tf.keras.layers.Concatenate()([Z, skip.output])
             Z = tf.keras.layers.Conv1D(
                 units, kernel_size=kernel, strides=stride, padding='same')(Z)
-            # Z = tf.keras.layers.BatchNormalization()(Z)                    
+            # Z = tf.keras.layers.BatchNormalization()(Z)
             Z = tf.keras.layers.Activation(activation)(Z)
             Z = tf.keras.layers.UpSampling1D(size=2)(Z)
-            
+
         Z = tf.keras.layers.Conv1D(
             1, kernel_size=kernels_size_and_stride[0][0], strides=kernels_size_and_stride[0][1],
-            activation=activation, padding='same')(Z)      
+            activation=activation, padding='same')(Z)
 
         Y = tf.keras.layers.Dense(n_inputs[0])(tf.keras.layers.Flatten()(Z))
         self.model = tf.keras.Model(inputs=X, outputs=Y)
@@ -376,19 +376,19 @@ class SkipNeuralNetwork(NeuralNetwork):
         else:
             str += '  Network is not trained.'
         return str
-    
-    
+
+
 
 class MultiNeuralNetwork():
-    def __init__(self, n_im_inputs, n_rap_inputs, im_hiddens_list, 
+    def __init__(self, n_im_inputs, n_rap_inputs, im_hiddens_list,
                  n_units_in_conv_layers, kernels_size_and_stride,
                  n_outputs, im_activation='tanh', rap_activation='relu', seed=None):
-        
+
         assert ((len(n_im_inputs) == 3)), f'Image must be HxWxC dimensions, {n_im_inputs}'
         assert (isinstance(im_hiddens_list, list)), f'{type(self).__name__}: im_hiddens_list must be a list.'
         assert (isinstance(n_units_in_conv_layers, list)), f'{type(self).__name__}: n_units_in_conv_layers must be a list.'
         assert (isinstance(kernels_size_and_stride, list)), f'{type(self).__name__}: kernels_size_and_stride must be a list.'
-        
+
         self.seed = seed
         self._set_seed()
         tf.keras.backend.clear_session()
@@ -399,46 +399,36 @@ class MultiNeuralNetwork():
         self.n_units_in_conv_layers = n_units_in_conv_layers
         self.kernels_size_and_stride = kernels_size_and_stride
         self.n_outputs = n_outputs
-        
+
+        # IM Input
         X1 = tf.keras.Input(shape=n_im_inputs, name='im')
-        
-        Z = tf.keras.layers.Flatten()(X1)
-        for units in im_hiddens_list[:-1]:
-            Z = tf.keras.layers.Dense(units, activation=im_activation)(Z)
-            
-        Z = tf.keras.layers.Dense(im_hiddens_list[-1])(Z)
-        
-        def _pad_upper_zeros(z):
-            """Pad `n_rap_inputs` minus the previous unit outputs with zeros to every 
-            tensor in the batch. This isolates the information only near the surface.
-            """
-            prev_units = n_rap_inputs[0] - z.shape[1]
-            zeros =  tf.expand_dims(tf.zeros(prev_units), axis=0)
-            repeat = tf.squeeze(tf.keras.layers.RepeatVector(tf.shape(z)[0])(zeros), axis=0)
-            return tf.expand_dims(tf.concat([z, repeat], axis=1), axis=-1)
-     
-        # pad with zeros to match rap input
-        # out = tf.keras.layers.Lambda(_pad_upper_zeros)(Z)
-        out = tf.expand_dims(tf.keras.layers.Dense(256)(Z), axis=-1)
-        
-        X2 = tf.keras.Input(shape=n_rap_inputs, name='rap')
-        Z = tf.keras.layers.Concatenate(axis=2)([X2, out])
+        Z1 = tf.keras.layers.Flatten()(X1)
+
+        if not (im_hiddens_list == [] or im_hiddens_list == [0]):
+            for units in im_hiddens_list:
+                Z1 = tf.keras.layers.Dense(units, activation=im_activation)(Z1)
+
+        # RAP Input
+        X2 = Z2 = tf.keras.Input(shape=n_rap_inputs, name='rap')
 
         for (kernel, stride), units in zip(kernels_size_and_stride, n_units_in_conv_layers):
-            Z = tf.keras.layers.Conv1D(units, kernel_size=kernel, strides=stride,
-                                       activation=rap_activation, padding='same')(Z)
-            Z = tf.keras.layers.MaxPooling1D(pool_size=2)(Z)
-        
-        Y = tf.keras.layers.Dense(n_outputs, name='out')(tf.keras.layers.Flatten()(Z))
+            Z2 = tf.keras.layers.Conv1D(units, kernel_size=kernel, strides=stride,
+                                       activation=rap_activation, padding='same')(Z2)
+            Z2 = tf.keras.layers.MaxPooling1D(pool_size=2)(Z2)
+        Z2 = tf.keras.layers.Flatten()(Z2)
+
+        # Join IM + RAP
+        Z = tf.keras.layers.Concatenate(axis=1)([Z1, Z2])
+        Y = tf.keras.layers.Dense(n_outputs, name='out')(Z)
         self.model = tf.keras.Model(inputs=[X1, X2], outputs=Y)
-        
+
         self.IMmeans = None
         self.IMstds = None
         self.RAPmeans = None
         self.RAPstds = None
         self.RAOBmeans = None
         self.RAOBstds = None
-        
+
         self.history = None
         self.training_time = None
 
@@ -449,13 +439,13 @@ class MultiNeuralNetwork():
         else:
             str += '  Network is not trained.'
         return str
-    
+
     def _set_seed(self):
         if self.seed:
             np.random.seed(self.seed)
             random.seed(self.seed)
             tf.random.set_seed(self.seed)
-            
+
     def _setup_standardize(self, im, rap, raob):
         if self.IMmeans is None:
             self.IMmeans = im.mean(axis=0)
@@ -463,7 +453,7 @@ class MultiNeuralNetwork():
             self.IMconstant = self.IMstds == 0
             self.IMstdsFixed = copy.copy(self.IMstds)
             self.IMstdsFixed[self.IMconstant] = 1
-       
+
         if self.RAPmeans is None:
             self.RAPmeans = rap.mean(axis=0)
             self.RAPstds = rap.std(axis=0)
@@ -485,7 +475,7 @@ class MultiNeuralNetwork():
 
     def _unstandardizeIM(self, im):
         return self.IMstds * im + self.IMmeans
-            
+
     def _standardizeRAP(self, rap):
         result = (rap - self.RAPmeans) / self.RAPstdsFixed
         result[:, self.RAPconstant] = 0.0
@@ -501,22 +491,22 @@ class MultiNeuralNetwork():
 
     def _unstandardizeRAOB(self, raob):
         return self.RAOBstds * raob + self.RAOBmeans
-    
+
     def train(self, im, rap, raob, n_epochs, batch_size, method='sgd',
               verbose=False, learning_rate=0.001, validation=None, loss_f=None):
         """Use Keras Functional API to train model"""
-        
+
         self._set_seed()
         self._setup_standardize(im, rap, raob)
-        
+
         im = self._standardizeIM(im)
         rap  = self._standardizeRAP(rap)
         raob = self._standardizeRAOB(raob)
-        
+
         if validation is not None:
             try:
-                # TODO: Implement this
-                validation = None
+                validation = ({'im': self._standardizeIM(validation[0]), 'rap': self._standardizeRAP(validation[1])},
+                              self._standardizeRAOB(validation[2]))
             except:
                 raise TypeError(
                     f'validation must be of the following shape: (im, rap, raob)')
@@ -535,7 +525,10 @@ class MultiNeuralNetwork():
                            metrics=[tf.keras.metrics.RootMeanSquaredError(),
                                     metrics.unstd_rmse(self._unstandardizeRAOB)])
 
-        callback = [callbacks.TrainLogger(n_epochs, step=5)] if verbose else None
+        callback = [tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=1e-4, patience=10)] if validation is not None else []
+        if verbose:
+            callback.append(callbacks.TrainLogger(n_epochs, step=5))
+
         start_time = time.time()
         self.history = self.model.fit({'im': im, 'rap': rap}, {'out': raob},
                                       batch_size=batch_size, epochs=n_epochs, verbose=0,
@@ -550,11 +543,11 @@ class MultiNeuralNetwork():
         """
         # Set to error logging after model is trained
         tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
-        im = self._standardizeIM(X['im'])
-        rap  = self._standardizeRAP(X['rap'])
+        im  = self._standardizeIM(X['im'])
+        rap = self._standardizeRAP(X['rap'])
         Y = self._unstandardizeRAOB(self.model.predict({'im': im, 'rap': rap}))
         return Y
-        
+
     def save(self, path):
         self.model.save(path)
         del self.model
