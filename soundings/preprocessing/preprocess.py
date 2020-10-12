@@ -204,17 +204,64 @@ def set_goes_data(time, lon, lat, dataset):
     goes16_abi_timestep.close()
 
 
-def extract_all_information():
-
-    start_t = cpytime.time()
+def extract_sgp_information():
     
     already_processed = glob(join(config['output_path'], '*'))
     
-    with open(config['raob']['valid_files_path']) as fp:
+    with open(config['raob']['valid_sgp_files_path']) as fp:
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
             path = fp.readline().rstrip('\n')
             while path:
-                if '.201906' not in path:
+                if config['date_regex'] not in path:
+                    path = fp.readline().rstrip('\n')
+                    continue
+        
+                # arm-sgp / year / file.cdf
+                sonde = xr.open_dataset(
+                    join(config['raob']['path'], *path.split('/')[-3:]))
+                dataset = DataHolder(sonde)
+                
+                if f"{config['output_path']}/sgp_{dataset.sonde_time.strftime('%Y_%m_%d_%H%M')}.nc" in already_processed:
+                    path = fp.readline().rstrip('\n')
+                    continue
+
+                futures = []
+
+                futures.append(pool.submit(set_radiosonde_profile,
+                                           sonde, path, dataset))
+                futures.append(pool.submit(set_goes_data, dataset.sonde_time, dataset.sonde_lon,
+                                           dataset.sonde_lat, dataset))
+                futures.append(pool.submit(set_rtma_data, dataset.sonde_time, dataset.sonde_lon,
+                                           dataset.sonde_lat, dataset))
+                futures.append(pool.submit(set_nwp_profile, dataset.sonde_time, dataset.sonde_lon,
+                                           dataset.sonde_lat, dataset))
+                try:
+                    for future in concurrent.futures.as_completed(futures, timeout=20):
+                        try:
+                            _ = future.result()
+                        except Exception as e:
+                            raise e
+                    dataset.save(config['output_path'])
+                except Exception as e:
+                    print(f"ERROR: {path.split('/')[-1]}, {e}")
+
+                sonde.close()
+                del dataset
+
+                path = fp.readline().rstrip('\n')
+    
+
+def extract_noaa_information():
+
+    already_processed = glob(join(config['output_path'], '*'))
+    
+    files = glob.glob(join("/mnt/mlnas01/mlsoundings/raobs/noaa-esrl", '*', f"*{config['date_regex']}*"))
+    
+    with open(config['raob']['valid_sgp_files_path']) as fp:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+            path = fp.readline().rstrip('\n')
+            while path:
+                if config['date_regex'] not in path:
                     path = fp.readline().rstrip('\n')
                     continue
         
@@ -252,19 +299,23 @@ def extract_all_information():
 
                 path = fp.readline().rstrip('\n')
 
-    print(f"runtime: {cpytime.time()-start_t}")
-
-
+                
 def main(config_path):
     global config
+    
+    start_t = cpytime.time()
     with open(config_path, 'r') as stream:
         try:
             config = yaml.safe_load(stream)
         except yaml.YAMLError as exc:
             print(exc)
             sys.exit(1)
-    extract_all_information()
-
+    if config['raob']['process_noaa_files']:
+        extract_noaa_information()
+    else:
+        extract_sgp_information()
+        
+    print(f"runtime: {cpytime.time()-start_t}")
 
 if __name__ == "__main__":
     """
