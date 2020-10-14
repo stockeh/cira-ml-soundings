@@ -109,8 +109,8 @@ class RAPLoader(object):
         spec = np.zeros((len(locations), 50))
         height = np.zeros((len(locations), 50))
         
-        lons = np.zeros((len(locations), 1))
-        lats = np.zeros((len(locations), 1))
+        lons = np.zeros((len(locations)))
+        lats = np.zeros((len(locations)))
         
         for line in values:
             items = line.split(':')
@@ -118,9 +118,9 @@ class RAPLoader(object):
 
             for l, loc in enumerate(items[7:]):
                 
-                if lons[l, 0] == 0:
-                    lons[l, 0] = float(loc[loc.find('lon=') + len('lon='):loc.find('lat=') - 1])
-                    lats[l, 0] = float(loc[loc.find('lat=') + len('lat='):loc.find('val=') - 1])
+                if lons[l] == 0:
+                    lons[l] = float(loc[loc.find('lon=') + len('lon='):loc.find('lat=') - 1])
+                    lats[l] = float(loc[loc.find('lat=') + len('lat='):loc.find('val=') - 1])
 
                 value = float(loc.split('val=')[-1])
                 identifier = items[3]
@@ -133,14 +133,5 @@ class RAPLoader(object):
                     temp[l, index] = value
                 if identifier == 'SPFH':
                     spec[l, index] = value
-
-        # implemented to be backwards compatable
-        if len(locations) == 1:
-            pres = pres.flatten()
-            temp = temp.flatten()
-            spec = spec.flatten()
-            height = height.flatten()
-            lons = lons.flatten()
-            lats = lats.flatten()
         
         return pres, temp, spec, height, lons, lats

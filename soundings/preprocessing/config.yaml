@@ -7,15 +7,15 @@ goes:
   path: /mnt/mlnas01/mlsoundings/goes16
 raob:
   profile_dims: 256
-  alt_el: 18000
+  top_window_boundary: 17000
   path: /mnt/mlnas01/mlsoundings/raobs
-  valid_sgp_files_path: /mnt/data1/stock/mlsoundings/raobs/profiles-alt-files-processed.txt
-  process_noaa_files: True
+  valid_sgp_files_path: # /mnt/data1/stock/mlsoundings/raobs/profiles-alt-files-processed.txt
+  noaa_mutli_path: /mnt/mlnas01/mlsoundings/raobs/noaa-esrl
 rtma:
   rtma_type: [LPI, LRI, LTI]
   patch_x_length_pixels: 3
   patch_y_length_pixels: 3
-  time_range_minutes: 40
+  time_range_minutes: 60
   path: /mnt/mlnas01/mlsoundings/rtma
 nwp:
   nwp_dims: 50
@@ -23,4 +23,4 @@ nwp:
   path: /mnt/mlnas01/grasso/cira
   wgrib2: /home/stock/bin/grib2/wgrib2/wgrib2
 output_path: /mnt/data1/stock/mlsoundings/processed
-date_regex: 201906
+date_regex: 20190601

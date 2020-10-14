@@ -26,7 +26,7 @@ class RTMALoader(object):
         interval in number of minutes to search for file that matches input time
     """
 
-    def __init__(self, path, date, rtma_types=np.array(['LPI']), time_range_minutes=30):
+    def __init__(self, path, date, rtma_types=np.array(['LPI']), time_range_minutes=60):
         if not exists(path):
             raise FileNotFoundError(f'Path: {path} does NOT exist.')
         if not isinstance(date, pd.Timestamp):
@@ -98,7 +98,7 @@ class RTMALoader(object):
             full path to requested RTMA file
         """
         rtma_files = np.array(sorted(glob(join(self.path, rtma_type.lower(), self.date.strftime('%Y'),
-                                               f"*_{rtma_type}_{self.date.strftime('%Y%m%d')}", "*"))))
+                                               f"*_{rtma_type}_{self.date.strftime('%Y%m')}*", "*"))))
         # print("rtma_files", rtma_files)
         rtma_dates = self._rtma_file_dates(rtma_files)
         # print("rtma_dates", rtma_dates)
