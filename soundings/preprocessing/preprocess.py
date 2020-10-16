@@ -34,7 +34,7 @@ class DataHolder(object):
         self.nwp_lat = None
         self.nwp_pres = None
         self.nwp_tdry = None
-        self.nwp_spfm = None
+        self.nwp_dp = None
         self.nwp_alt = None
         
         self.goes_files = None
@@ -48,18 +48,22 @@ class DataHolder(object):
         self.rtma_patch_lats = None
 
     def save(self, processed_dir):
+        
         patch_ds = xr.Dataset(data_vars={'sonde_rel_time': (self.sonde_time),
                                          'sonde_file': (self.sonde_file),
+                                         'sonde_site_id': (self.sonde_site_id),
+                                         'sonde_lon': (self.sonde_lon),
+                                         'sonde_lat': (self.sonde_lat),
                                          'sonde_pres': (('profile_dims'), self.sonde_pres),
                                          'sonde_tdry': (('profile_dims'), self.sonde_tdry),
                                          'sonde_dp': (('profile_dims'), self.sonde_dp),
                                          'sonde_alt': (('profile_dims'), self.sonde_alt),
                                          'nwp_file': (self.nwp_file),
-                                         'nwp_lon': (self.nwp_file),
-                                         'nwp_lat': (self.nwp_file),
+                                         'nwp_lon': (self.nwp_lon),
+                                         'nwp_lat': (self.nwp_lat),
                                          'nwp_pres': (('nwp_dims'), self.nwp_pres),
                                          'nwp_tdry': (('nwp_dims'), self.nwp_tdry),
-                                         'nwp_spfm': (('nwp_dims'), self.nwp_spfm),
+                                         'nwp_dp': (('nwp_dims'), self.nwp_dp),
                                          'nwp_alt': (('nwp_dims'), self.nwp_alt),
                                          'goes_files': (('band'), self.goes_files),
                                          'goes_abi': (('band', 'goes_y', 'goes_x'), self.goes_patches),
@@ -96,6 +100,7 @@ class DataHolder(object):
         except OSError:
             pass
         patch_ds.to_netcdf(out_file, engine='netcdf4')
+        patch_ds.close()
 
 
 def interpolate_to_height_intervals(alt, y, altitude_intervals):
@@ -124,47 +129,119 @@ def extract_nwp_values(time, locations):
     return rap_timestep.rap_file, pres, temp, spec, height, lons, lats
     
     
-def set_nwp_profile(nwp_file, pres, temp, spec, height,
-                    lon, lat, dataset):
+def set_nwp_profile(nwp_file, p, t, q, h, lon, lat, dataset):
+    """
+    Set the RAP data by first converting specific humidity to dew point temperature, 
+    then linearly interpolate to the specified dimension.
+    
+    ---
+    params:
+    
+    p : np.array
+        pressure in Pa
+        
+    t : np.array
+        temperature in K
+        
+    q : np.array
+        specific humidity
+    
+    h : np.array
+        height in m
+    """
+    
+    if lon == 999.0 or lat == 999.0:
+        raise ValueError(f'[NWP] invalid lon {lon} lat {lat}.')
+    
+    altitude_intervals = np.linspace(h[0], h[0] + config['top_window_boundary'], config['nwp']['nwp_dims'])
+
+    t -= 273.15 # convert K to deg C
+
+    pres = interpolate_to_height_intervals(h, p/100., altitude_intervals)  # convert Pa to hPa
+    tdry = interpolate_to_height_intervals(h, t, altitude_intervals)
+
+    epsilon = 0.622
+    A = 17.625
+    B = 243.04 # deg C
+    C = 610.94 # Pa
+
+    # vapor pressure
+    e = p*q / (epsilon + (1 - epsilon)*q)
+    if e[0] == 0: # replace first value with eps if zero
+        e[0] = np.finfo(float).eps
+    if e.all() == 0: # forward fill values where zero exist
+        prev = np.arange(len(e))
+        prev[e == 0] = 0
+        prev = np.maximum.accumulate(prev)
+        e = e[prev]
+    # dewpoint temperature 
+    td = B * np.log(e/C) / (A - np.log(e/C))
+    td = interpolate_to_height_intervals(h, td, altitude_intervals)
+
     dataset.nwp_file = nwp_file
     dataset.nwp_lon  = lon
     dataset.nwp_lat  = lat
     dataset.nwp_pres = pres
-    dataset.nwp_tdry = temp
-    dataset.nwp_spfm = spec
-    dataset.nwp_alt  = height
-    
+    dataset.nwp_tdry = tdry
+    dataset.nwp_dp = td
+    dataset.nwp_alt  = altitude_intervals
+
     
 def set_noaa_profile(xar, path, s, dataset):
+    
+    def _remove_unsorted_vals(arr):
+        # assumes that the first value is correct.
+        mini = arr[0]
+        is_valid = np.zeros(len(arr), dtype=bool)
+        for i, v in enumerate(arr[1:]):
+            if v < mini:
+                is_valid[i+1] = True
+            else:
+                is_valid[i+1] = False
+                mini = v
+        arr[is_valid] = np.nan
+        return arr
+    
     numMand = xar.numMand.values[s]
     numSigT = xar.numSigT.values[s]
 
-    ht = np.concatenate([xar.htMan.values[s, :numMand], xar.htSigT.values[s, :numSigT]])
-    
-    # get indicies of values ordered by height, and remove nans.
-    order = ht.argsort()
-    ht = ht[order]
-    nans = np.isnan(ht)
-    order = order[~nans]
-    ht = ht[~nans]
+    htMan = _remove_unsorted_vals(xar.htMan.values[s, :numMand])
+    htSigT = _remove_unsorted_vals(xar.htSigT.values[s, :numSigT])
 
-    p = np.concatenate([xar.prMan.values[s, :numMand], xar.prSigT.values[s, :numSigT]])[order]
-    t = np.concatenate([xar.tpMan.values[s, :numMand], xar.tpSigT.values[s, :numSigT]])[order]
-    td = t - (np.concatenate([xar.tdMan.values[s, :numMand], xar.tdSigT.values[s, :numSigT]])[order])
-    # convert K to C
-    t -= 273.15
+    ht = np.concatenate([htMan, htSigT])
+    
+    p = np.concatenate([xar.prMan.values[s, :numMand], xar.prSigT.values[s, :numSigT]])
+    t = np.concatenate([xar.tpMan.values[s, :numMand], xar.tpSigT.values[s, :numSigT]])
+    td = t - np.concatenate([xar.tdMan.values[s, :numMand], xar.tdSigT.values[s, :numSigT]])
+    
+    ht_nans = np.isnan(ht)
+    p_nans  = np.isnan(p)
+    t_nans  = np.isnan(t)
+    td_nans = np.isnan(td)
+    # remove nans
+    nans = ht_nans | p_nans | t_nans | td_nans
+    ht = ht[~nans]; p = p[~nans]; t = t[~nans]; td = td[~nans]
+    # sort by height
+    order = ht.argsort()
+    ht = ht[order]; p = p[order]; t = t[order]; td = td[order]
+    
+    t -= 273.15 # convert K to C
     td -= 273.15
     
+    if max(ht) < config['top_window_boundary']:
+        raise ValueError(f"[RAOB] unable to interpolate top boundary layers. " \
+                         f"data has max of {max(ht):.3f} < {config['top_window_boundary']} for defined value.") 
+    
     altitude_intervals = np.linspace(
-        ht[0], ht[0] + config['raob']['top_window_boundary'], config['raob']['profile_dims'])
+        ht[0], ht[0] + config['top_window_boundary'], config['raob']['profile_dims'])
     dataset.sonde_pres = interpolate_to_height_intervals(ht, p, altitude_intervals)
     dataset.sonde_tdry = interpolate_to_height_intervals(ht, t, altitude_intervals)
     dataset.sonde_dp   = interpolate_to_height_intervals(ht, td, altitude_intervals)
     dataset.sonde_alt  = altitude_intervals
-
+    
     dataset.sonde_file = path
-    dataset.sonde_site_id = xar.staName.values[s]
-
+    dataset.sonde_site_id = xar.staName.values[s].decode('UTF-8').strip().lower()
+    
 
 def set_sgp_profile(sonde, path, dataset):
     """
@@ -188,8 +265,8 @@ def set_sgp_profile(sonde, path, dataset):
             break
 
     altitude_intervals = np.linspace(
-        alt_s, config['raob']['top_window_boundary'], config['raob']['profile_dims'])
-    np.set_printoptions(threshold=sys.maxsize)
+        alt[start_indx:], alt[start_indx:] + config['top_window_boundary'], config['raob']['profile_dims'])
+
     dataset.sonde_pres = interpolate_to_height_intervals(
         alt[start_indx:], p[start_indx:], altitude_intervals)
     dataset.sonde_tdry = interpolate_to_height_intervals(
@@ -288,7 +365,7 @@ def extract_sgp_information():
                             raise e
                     dataset.save(config['output_path'])
                 except Exception as e:
-                    print(f"ERROR: {path.split('/')[-1]}, {e}")
+                    print(f"ERROR: {dataset.sonde_site_id} {path.split('/')[-1]}, {e}")
 
                 sonde.close()
                 del dataset
@@ -296,9 +373,8 @@ def extract_sgp_information():
                 path = fp.readline().rstrip('\n')
     
 
-def _group_by_times(inds, rel_times):
+def _group_by_times(inds, timestamps):
     """Group radiosondes by release time rounded by day+hour."""
-    timestamps = pd.to_datetime(rel_times[inds], unit='s')
     rounded_timestamps = timestamps.round('H')
     days = rounded_timestamps.day.values
     hours = rounded_timestamps.hour.values
@@ -313,26 +389,31 @@ def _group_by_times(inds, rel_times):
     return groups
     
     
-def _process_station_groups(f, xar, rel_times, inds, group, pool):
+def _process_station_groups(f, xar, rel_times, group, pool):
     # locations are different for each in group
     locations = list(zip(xar.staLon.values[group], xar.staLat.values[group]))
     # all dates in the group are rounded to the same. grab first.
     group_time = pd.Timestamp(rel_times[group[0]], unit='s', tz='UTC')
-
-    start_t = cpytime.time()
-    nwp_file, pres, temp, spec, height, \
-            lons, lats = extract_nwp_values(group_time, locations)
-    print(f'{len(locations)} locations finished in {cpytime.time() - start_t} s')
+    
+    # start_t = cpytime.time()
+    try:
+        nwp_file, pres, temp, spec, height, \
+                lons, lats = extract_nwp_values(group_time, locations)
+    except FileNotFoundError as fnfe:
+        print(f"ERROR: [NWP] {f.split('/')[-1]}, {fnfe}")
+        return 
+    # print(f'{len(locations)} locations finished in {cpytime.time() - start_t} s')
 
     for i, s in enumerate(group):
         time = pd.Timestamp(rel_times[s], unit='s', tz='UTC')
         dataset = DataHolder(time)
-        set_nwp_profile(nwp_file, pres[i], temp[i], spec[i], height[i], lons[i], lats[i], dataset)
         dataset.sonde_lon = locations[i][0]
         dataset.sonde_lat = locations[i][1]
 
         futures = []
-
+        
+        futures.append(pool.submit(set_nwp_profile, nwp_file, pres[i], temp[i], spec[i],
+                                   height[i], lons[i], lats[i], dataset))
         futures.append(pool.submit(set_noaa_profile, xar, f, s, dataset))
         futures.append(pool.submit(set_goes_data, dataset.sonde_time, dataset.sonde_lon,
                                    dataset.sonde_lat, dataset))
@@ -345,40 +426,53 @@ def _process_station_groups(f, xar, rel_times, inds, group, pool):
                     _ = future.result()
                 except Exception as e:
                     raise e
-            print((dataset.sonde_lon, dataset.sonde_lat), (dataset.nwp_lon, dataset.nwp_lat))
-            return
-            # dataset.save(config['output_path'])
+            dataset.save(config['output_path'])
         except Exception as e:
-            print((dataset.sonde_lon, dataset.sonde_lat), (dataset.nwp_lon, dataset.nwp_lat))
-            print(f"ERROR: {f.split('/')[-1]}, {e}")
+            print(f"ERROR: {dataset.sonde_site_id} {f.split('/')[-1]}, {e}")
 
-        xar.close()
         del dataset
 
     
 def extract_noaa_information():
     """Process with the NOAA radiosondes"""
+    invalid_location_ids = ['brw', 'ome', 'bet', 'anc', 'snp', 'akn', 'adq', 'yak', 'ann', '9999']
     already_processed = glob(join(config['output_path'], '*'))
-    
     files = glob(join(f"{config['raob']['noaa_mutli_path']}", '*', f"*{config['date_regex']}*"))
-
+    
     with concurrent.futures.ThreadPoolExecutor(max_workers=10) as pool:
         for f in files:
+            print('processing:', f)
             xar = xr.open_dataset(f, decode_times=False)
             rel_times = xar.relTime.values
+            
             # should the mask look at other values? e.g., top-sfc > 17,000?
-            inds = xar.recNum.values[rel_times != 99999]
-
-            groups = _group_by_times(inds, rel_times)
+            mask = rel_times != 99999
+            
+            timestamps = pd.to_datetime(rel_times, unit='s')
+            
+            # filter out already processed files and invalid sites
+            for i, t in enumerate(timestamps):
+                site_id = xar.staName.values[i].decode('UTF-8').strip().lower()
+                output_file = f"{site_id}_{t.strftime('%Y_%m_%d_%H%M')}.nc"
+                if f"{config['output_path']}/{output_file}" in already_processed or site_id in invalid_location_ids:
+                    mask[i] = False
+                    
+            inds = xar.recNum.values[mask]  
+            timestamps = timestamps[mask]
+            
+            groups = _group_by_times(inds, timestamps)
+        
             # thread this to have all groups be processed at the same time.
             for group in groups:
-                _process_station_groups(f, xar,rel_times, inds, group, pool)
-
-        xar.close()
+                _process_station_groups(f, xar, rel_times, group, pool)
+            xar.close()
 
                 
 def main(config_path):
     global config
+    
+    np.set_printoptions(threshold=sys.maxsize)
+    np.set_printoptions(suppress=True)
     
     start_t = cpytime.time()
     with open(config_path, 'r') as stream:

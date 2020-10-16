@@ -101,9 +101,10 @@ class RAPLoader(object):
             if not isinstance(center_lat, str):
                 center_lat = str(center_lat)
             command.extend(["-lon", center_lon, center_lat]) 
-            
-        values = subprocess.check_output(command).decode('utf-8').split('\n')[:-1]
         
+        # write wgrib2 errors to /dev/null
+        values = subprocess.check_output(command, stderr=subprocess.DEVNULL).decode('utf-8').split('\n')[:-1]
+
         pres = np.zeros((len(locations), 50))
         temp = np.zeros((len(locations), 50))
         spec = np.zeros((len(locations), 50))

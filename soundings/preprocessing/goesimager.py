@@ -251,7 +251,7 @@ class GOES16ABI(object):
                     patch[0, b, :, :] = self.goes16_ds[band]["Rad"][row_slice,
                                                                     col_slice].values
             except ValueError as ve:
-                raise ve
+                raise ValueError(f'lon {center_lon} and lat {center_lat} out of range')
 
         lons = self.lon[row_slice, col_slice]
         lats = self.lat[row_slice, col_slice]

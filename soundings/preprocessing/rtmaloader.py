@@ -194,11 +194,13 @@ class RTMALoader(object):
             np.argmin(np.abs(self.y - center_y)), self.y.shape)[0]
         center_col = np.unravel_index(
             np.argmin(np.abs(self.x - center_x)), self.x.shape)[1]
+        
         # Removed integer division // to allow for odd sizes images
         row_slice = slice(int(center_row - y_size_pixels / 2),
                           int(center_row + y_size_pixels / 2))
         col_slice = slice(int(center_col - x_size_pixels / 2),
                           int(center_col + x_size_pixels / 2))
+        
         patch = np.zeros((1, self.rtma_types.size, y_size_pixels,
                           x_size_pixels), dtype=np.float32)
         for t, rtma_type in enumerate(self.rtma_types):
@@ -207,7 +209,7 @@ class RTMALoader(object):
                 values = self.rtma_ds[rtma_type][self.analysis_index[t]].values[::-1]
                 patch[0, t, :, :] = values[row_slice, col_slice]
             except ValueError as ve:
-                raise ve
+                raise ValueError(f'lon {center_lon} and lat {center_lat} out of range')
 
         lons = self.lon[row_slice, col_slice]
         lats = self.lat[row_slice, col_slice]

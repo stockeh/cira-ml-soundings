@@ -8,7 +8,7 @@ import time
 
 from netCDF4 import Dataset
 from glob import glob
-from os.path import join
+from os.path import join, basename
 from scipy import interpolate
 
 from IPython.display import display
@@ -348,22 +348,32 @@ def interpolate_to_height_intervals(alt, y, altitude_intervals):
     f = interpolate.interp1d(alt, y)
     return f(altitude_intervals)
 
-def load_preprocessed_samples(vol, convert_sfpc_to_dewpoint=True, shuffle=False):
+
+def load_preprocessed_samples(vol, sgp=True, noaa=True, preprocesses_rap=False, shuffle=False):
     """Load the preprocessed data samples.
     
     params:
     ---
         vol : str
             Location for where the preprocessed files reside.
-        convert_sfpc_to_dewpoint : boolean
-            True to convert specific humiditiy to dewpoint, False otherwise
+        preprocesses_rap : boolean
+            True to convert specific humiditiy to dewpoint and interpolate, False otherwise
         shuffle : boolean
             True to shuffle files, False otherwise
     returns:
     ---
         raob, rap, goes, rtma, sonde_files
     """
-    files = np.array(sorted(glob(join(vol, '*'))))
+    if sgp and noaa:
+        files = np.array(sorted(glob(join(vol, '*'))))
+    elif sgp:
+        files = np.array(sorted(glob(join(vol, 'sgp*'))))
+    elif noaa:
+        files = np.array(sorted([fn for fn in glob(join(vol, '*')) 
+                                 if not basename(fn).startswith('sgp')]))
+    else:
+        print('invalid site selection.')
+        
     print(f'total of {len(files)} samples!')
     
     if shuffle: # SHUFFLE FOR SMALL DATASET
@@ -388,36 +398,45 @@ def load_preprocessed_samples(vol, convert_sfpc_to_dewpoint=True, shuffle=False)
                                        xar.sonde_dp.values.reshape(-1,1),
                                        xar.sonde_alt.values.reshape(-1,1)), axis=1)
         raob.append(raob_profile)
-        
-        alt = xar.nwp_alt.values
-        altitude_intervals = np.linspace(alt[0], 18_000, 256)
-        
-        p = xar.nwp_pres.values
-        t = xar.nwp_tdry.values-272.15 # convert to deg C
-        q = xar.nwp_spfm.values
-        
-        pres = interpolate_to_height_intervals(alt, p/100., altitude_intervals)  # convert Pa to hPa
-        tdry = interpolate_to_height_intervals(alt, t, altitude_intervals)
-        
-        epsilon = 0.622
-        A = 17.625
-        B = 243.04 # deg C
-        C = 610.94 # Pa
-        
-        # vapor pressure
-        e = p*q / (epsilon + (1 - epsilon)*q)
-        
-        if e[0] == 0: # replace first value with eps if zero
-            e[0] = np.finfo(float).eps
-        if e.all() == 0: # forward fill values where zero exist
-            prev = np.arange(len(e))
-            prev[e == 0] = 0
-            prev = np.maximum.accumulate(prev)
-            e = e[prev]
-        # dewpoint temperature 
-        td = B * np.log(e/C) / (A - np.log(e/C))
 
-        td = interpolate_to_height_intervals(alt, td, altitude_intervals)
+        # This really only needs to be done with files generated
+        # prior to Friday, Oct. 16, 2020
+        if preprocesses_rap:
+            alt = xar.nwp_alt.values
+            altitude_intervals = np.linspace(alt[0], 18_000, 256)
+
+            p = xar.nwp_pres.values
+            t = xar.nwp_tdry.values-273.15 # convert to deg C
+            q = xar.nwp_spfm.values
+
+            pres = interpolate_to_height_intervals(alt, p/100., altitude_intervals)  # convert Pa to hPa
+            tdry = interpolate_to_height_intervals(alt, t, altitude_intervals)
+        
+            epsilon = 0.622
+            A = 17.625
+            B = 243.04 # deg C
+            C = 610.94 # Pa
+
+            # vapor pressure
+            e = p*q / (epsilon + (1 - epsilon)*q)
+
+            if e[0] == 0: # replace first value with eps if zero
+                e[0] = np.finfo(float).eps
+            if e.all() == 0: # forward fill values where zero exist
+                prev = np.arange(len(e))
+                prev[e == 0] = 0
+                prev = np.maximum.accumulate(prev)
+                e = e[prev]
+            # dewpoint temperature 
+            td = B * np.log(e/C) / (A - np.log(e/C))
+            
+            td = interpolate_to_height_intervals(alt, td, altitude_intervals)
+            
+        else:
+            pres = xar.nwp_pres.values
+            tdry = xar.nwp_tdry.values
+            td = xar.nwp_dp.values
+            altitude_intervals = xar.nwp_alt.values
         
         rap_profile = np.concatenate((pres.reshape(-1,1),
                                       tdry.reshape(-1,1),
@@ -426,7 +445,8 @@ def load_preprocessed_samples(vol, convert_sfpc_to_dewpoint=True, shuffle=False)
         rap.append(rap_profile)
         goes.append(xar.goes_abi.values)
         rtma.append(xar.rtma_values.values)
-        sonde_files.append(str(xar.sonde_file.values))
+        sonde_files.append(f"{str(xar.sonde_site_id.values)}_{str(xar.sonde_rel_time.values)}_" \
+                           f"{str(xar.sonde_file.values).split('/')[-1][:-4]}")
         xar.close()
         fp.value += 1
 
