@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from soundings.deep_learning import mlutilities as ml
 from soundings.plotting import radiosonde_plotting
 
-def plot_altitude_rmse_verticle(nnet, X, T, NWP_Temp, alt, file_name=None):
+def plot_altitude_rmse_verticle(nnet, X, T, NWP_Temp, alt=None, file_name=None):
     """
     Plot the RMSE over different altitudes for some NeuralNetwork architecture.
 
@@ -32,8 +32,10 @@ def plot_altitude_rmse_verticle(nnet, X, T, NWP_Temp, alt, file_name=None):
         figure_height = 6
         line_width = 2.5
         
-    surface_error = 25
+    surface_error = NWP_Temp.shape[1] // 8
     
+    # @OVERRIDE alt
+    alt = np.arange(NWP_Temp.shape[1])
     rap_color = radiosonde_plotting.DEFAULT_OPTION_DICT[radiosonde_plotting.NWP_LINE_COLOUR_KEY]
     ml_color = radiosonde_plotting.DEFAULT_OPTION_DICT[radiosonde_plotting.PREDICTED_LINE_COLOUR_KEY]
     
@@ -49,7 +51,7 @@ def plot_altitude_rmse_verticle(nnet, X, T, NWP_Temp, alt, file_name=None):
     axs[0].plot(rap_rmse, alt, color=rap_color, linewidth=line_width)
     axs[0].axvline(rap_mean_rmse, label=f'RAP: {rap_mean_rmse:.3f}',
                    color=rap_color, linestyle='--', linewidth=line_width)
-    
+            
     rap_rmse = np.sqrt((np.mean((NWP_Temp[:, :surface_error] - T[:, :surface_error])**2, axis=0)))
     rap_mean_rmse = ml.rmse(NWP_Temp[:, :surface_error], T[:, :surface_error])
 
@@ -60,6 +62,7 @@ def plot_altitude_rmse_verticle(nnet, X, T, NWP_Temp, alt, file_name=None):
     # !!! Added for difference between RAP and RAOB
     # Y = nnet.use(X) + NWP_Temp
     Y = nnet.use(X)
+    
     ml_rmse = np.sqrt((np.mean((Y - T)**2, axis=0)))
     ml_mean_rmse = ml.rmse(Y, T)
     
@@ -74,11 +77,24 @@ def plot_altitude_rmse_verticle(nnet, X, T, NWP_Temp, alt, file_name=None):
     axs[1].axvline(ml_mean_rmse, label=f'ML: {ml_mean_rmse:.3f}',
                    color=ml_color, linestyle='--', linewidth=line_width)
 
-    axs[0].set_ylabel('Altitude [m]', fontsize=default_font)
+    axs[0].set_ylabel('Altitude', fontsize=default_font)
     axs[0].set_xlabel('RMSE [C]', fontsize=default_font)
     axs[1].set_xlabel('RMSE [C]', fontsize=default_font)
     axs[0].legend(fontsize=default_font)
     axs[1].legend(fontsize=default_font, loc='upper right')
+    
+    n_ticks = 5
+    axs[0].set_yticks(np.linspace(alt.min(), alt.max(), n_ticks))
+    axs[0].set_yticklabels(['sfc'] + ['']*(n_ticks-2) + ['top'])
+    for i, label in enumerate(axs[0].get_yticklabels()):
+        if i > 0 and i < len(axs[0].get_yticklabels()) - 1:
+            label.set_visible(False) 
+    
+    axs[1].set_yticks(np.linspace(alt[:surface_error].min(), alt[:surface_error].max(), n_ticks))
+    axs[1].set_yticklabels(['sfc'] + ['']*(n_ticks-2) + ['${1}/{n}^{th}$'])
+    for i, label in enumerate(axs[0].get_yticklabels()):
+        if i > 0 and i < len(axs[0].get_yticklabels()) - 1:
+            label.set_visible(False) 
     
     for ax in axs:
         ax.tick_params(axis='x', labelsize=default_font)

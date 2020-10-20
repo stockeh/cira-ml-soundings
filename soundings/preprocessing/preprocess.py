@@ -409,7 +409,7 @@ def _process_station_groups(f, xar, rel_times, group, pool):
         dataset = DataHolder(time)
         dataset.sonde_lon = locations[i][0]
         dataset.sonde_lat = locations[i][1]
-
+        # print(xar.staName.values[s].decode('UTF-8').strip().lower(), dataset.sonde_lon, dataset.sonde_lat)
         futures = []
         
         futures.append(pool.submit(set_nwp_profile, nwp_file, pres[i], temp[i], spec[i],
@@ -435,7 +435,8 @@ def _process_station_groups(f, xar, rel_times, group, pool):
     
 def extract_noaa_information():
     """Process with the NOAA radiosondes"""
-    invalid_location_ids = ['brw', 'ome', 'bet', 'anc', 'snp', 'akn', 'adq', 'yak', 'ann', '9999']
+    invalid_location_ids = ['9999','adq','akn','anc','ann','bet','bna','brw','cdb',
+                            'fai','ito','jsj','lih','mcg','ome','otz','sle','snp','sya','yak']
     already_processed = glob(join(config['output_path'], '*'))
     files = glob(join(f"{config['raob']['noaa_mutli_path']}", '*', f"*{config['date_regex']}*"))
     
@@ -446,7 +447,8 @@ def extract_noaa_information():
             rel_times = xar.relTime.values
             
             # should the mask look at other values? e.g., top-sfc > 17,000?
-            mask = rel_times != 99999
+            mask = np.logical_and(rel_times != 99999, rel_times < 1e+20) 
+            rel_times[~mask] = 0 # avoid `pandas._libs.tslibs.np_datetime.OutOfBoundsDatetime` for invalid dates.
             
             timestamps = pd.to_datetime(rel_times, unit='s')
             

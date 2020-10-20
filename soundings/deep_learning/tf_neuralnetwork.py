@@ -133,7 +133,7 @@ class NeuralNetwork():
                 algo = tf.keras.optimizers.Adadelta(learning_rate=learning_rate)
         except:
             raise Exception(
-                "train: method={method} not one of 'scg' or 'adam'")
+                "train: method={method} not a valid optimizer in soundings.nn library.")
 
         loss = tf.keras.losses.MSE if loss_f == None else loss_f
 
@@ -141,9 +141,9 @@ class NeuralNetwork():
                            metrics=[metrics.unstd_mse(self._unstandardizeT),
                                     metrics.unstd_truncated_mse(self._unstandardizeT),
                                     metrics.unstd_rmse(self._unstandardizeT)])
-        callback = [tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=1e-4, patience=10)]
+        callback = [] # [tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=1e-1, patience=10)]
         if verbose:
-            callback.append(callbacks.TrainLogger(n_epochs, step=5))
+            callback.append(callbacks.TrainLogger(n_epochs, step=n_epochs//5))
 
         start_time = time.time()
         self.history = self.model.fit(X, T, batch_size=batch_size, epochs=n_epochs,
@@ -525,7 +525,7 @@ class MultiNeuralNetwork():
                            metrics=[tf.keras.metrics.RootMeanSquaredError(),
                                     metrics.unstd_rmse(self._unstandardizeRAOB)])
 
-        callback = [tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=1e-4, patience=10)] if validation is not None else []
+        callback = [tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=1e-5, patience=10)] if validation is not None else []
         if verbose:
             callback.append(callbacks.TrainLogger(n_epochs, step=5))
 
