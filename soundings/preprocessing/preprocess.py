@@ -399,8 +399,8 @@ def _process_station_groups(f, xar, rel_times, group, pool):
     try:
         nwp_file, pres, temp, spec, height, \
                 lons, lats = extract_nwp_values(group_time, locations)
-    except FileNotFoundError as fnfe:
-        print(f"ERROR: [NWP] {f.split('/')[-1]}, {fnfe}")
+    except (FileNotFoundError, Exception) as e:
+        print(f"ERROR: [NWP] {f.split('/')[-1]}, {e}")
         return 
     # print(f'{len(locations)} locations finished in {cpytime.time() - start_t} s')
 

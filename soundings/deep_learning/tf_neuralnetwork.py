@@ -199,7 +199,7 @@ class ConvolutionalNeuralNetwork(NeuralNetwork):
         for (kernel, stride), units in zip(kernels_size_and_stride, n_units_in_conv_layers):
             Z = tf.keras.layers.Conv1D(
                 units, kernel_size=kernel, strides=stride, activation=activation, padding='same')(Z)
-            # Z = tf.keras.layers.BatchNormalization()(Z)
+            Z = tf.keras.layers.BatchNormalization()(Z)
             Z = tf.keras.layers.Activation(activation)(Z)
             Z = tf.keras.layers.MaxPooling1D(pool_size=2)(Z)
             if dropout:
@@ -300,8 +300,12 @@ class ConvolutionalAutoEncoder(NeuralNetwork):
 
 
 class SkipNeuralNetwork(NeuralNetwork):
+    """ Architecture Referenced from Audio Super Resolution using Neural Networks.
+    https://github.com/kuleshov/audio-super-res - https://arxiv.org/abs/1708.00853
+    """
+    
     def __init__(self, n_inputs, n_units_in_conv_layers,
-                 kernels_size_and_stride, n_outputs, activation='relu', n_hidden_dims=100, seed=None):
+                 kernels_size_and_stride, n_outputs, seed=None):
 
         if not isinstance(n_units_in_conv_layers, (list, tuple)):
             raise Exception(
@@ -319,46 +323,47 @@ class SkipNeuralNetwork(NeuralNetwork):
         self.n_units_in_conv_layers = n_units_in_conv_layers
         self.kernels_size_and_stride = kernels_size_and_stride
         self.n_outputs = n_outputs
-        self.n_hidden_dim = n_hidden_dims
 
         # encoder
         X = Z = tf.keras.Input(shape=n_inputs)
 
         for (kernel, stride), units in zip(kernels_size_and_stride, n_units_in_conv_layers):
-            Z = tf.keras.layers.Conv1D(
-                units, kernel_size=kernel, strides=stride, padding='same')(Z)
-            # Z = tf.keras.layers.BatchNormalization()(Z)
-            Z = tf.keras.layers.Activation(activation)(Z)
+            Z = tf.keras.layers.Conv1D(units, kernel_size=kernel,
+                                       strides=stride, padding='same')(Z)
+            Z = tf.keras.layers.LeakyReLU(alpha=0.2)(Z)
             Z = tf.keras.layers.MaxPooling1D(pool_size=2)(Z)
-
-        encoder = tf.keras.Model(X, Z)
-        skips = list(reversed([layer for layer in encoder.layers if 'max' in layer.name]))
-        # latent vector
-        conv_shape = Z.shape[1:]
-        F = tf.keras.layers.Flatten()(Z)
-        # Z = tf.keras.layers.Dropout(0.50)(Z)
-        Z = tf.keras.layers.Dense(n_hidden_dims, activation='tanh')(F)
-
-        # decoder (input of `n_hidden_dim`)
-        # Z = tf.keras.layers.Dropout(0.50)(Z)
-        Z = tf.keras.layers.Dense(F.shape[1], activation='tanh')(Z)
-        Z = tf.keras.layers.Reshape(conv_shape)(Z)
+            
+        skips = list(reversed([layer for layer in tf.keras.Model(X, Z).layers if 'max' in layer.name]))
+    
+        # bottleneck layer
+        Z = tf.keras.layers.Conv1D(
+                n_units_in_conv_layers[-1], 
+                kernel_size=kernels_size_and_stride[-1][0], 
+                strides=kernels_size_and_stride[-1][1], 
+                padding='same')(Z)
+        Z = tf.keras.layers.LeakyReLU(alpha=0.2)(Z)
+        Z = tf.keras.layers.Dropout(0.50)(Z)
+        
+        # decoder
         for (kernel, stride), units, skip in zip(reversed(kernels_size_and_stride),
                                                  reversed(n_units_in_conv_layers),
                                                  skips):
-            # print(Z.shape, skip.output.shape)
-            Z = tf.keras.layers.Concatenate()([Z, skip.output])
-            Z = tf.keras.layers.Conv1D(
-                units, kernel_size=kernel, strides=stride, padding='same')(Z)
-            # Z = tf.keras.layers.BatchNormalization()(Z)
-            Z = tf.keras.layers.Activation(activation)(Z)
+            Z = tf.keras.layers.Conv1D(units, kernel_size=kernel, 
+                                       strides=stride, padding='same')(Z)
+            Z = tf.keras.layers.BatchNormalization()(Z)
+            Z = tf.keras.layers.Activation('relu')(Z)
+            Z = tf.keras.layers.Concatenate(axis=2)([Z, skip.output])
             Z = tf.keras.layers.UpSampling1D(size=2)(Z)
-
+            Z = tf.keras.layers.Dropout(0.50)(Z)
+            # print(Z.shape, skip.output.shape)
+            
+        # final conv layer (linear; no activation)
         Z = tf.keras.layers.Conv1D(
-            1, kernel_size=kernels_size_and_stride[0][0], strides=kernels_size_and_stride[0][1],
-            activation=activation, padding='same')(Z)
-
-        Y = tf.keras.layers.Dense(n_inputs[0])(tf.keras.layers.Flatten()(Z))
+                1, kernel_size=kernels_size_and_stride[0][0], 
+                strides=kernels_size_and_stride[0][1], padding='same')(Z)
+        
+        # add only the temperature profile back to Z.
+        Y = tf.keras.layers.Flatten()(tf.keras.layers.Add()([X[:,:,1:2] if X.shape[-1] == 2 else X, Z]))
         self.model = tf.keras.Model(inputs=X, outputs=Y)
 
         self.Xmeans = None

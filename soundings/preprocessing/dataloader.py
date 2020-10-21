@@ -342,7 +342,6 @@ def read_radiosonde_launch(dataset, rec, interpolate_dim=256):
     return profile, metadata
 
 
-
 def interpolate_to_height_intervals(alt, y, altitude_intervals):
     # TODO: Should this be done in preprocessing?
     f = interpolate.interp1d(alt, y)
@@ -351,7 +350,7 @@ def interpolate_to_height_intervals(alt, y, altitude_intervals):
 
 def load_preprocessed_samples(vol, sgp=True, noaa=True, preprocesses_rap=False, shuffle=False):
     """Load the preprocessed data samples.
-    
+    The nans should be removed after loading: nans = np.unique(np.argwhere(np.isnan(raob/rap/goes/rtma))[:,0])
     params:
     ---
         vol : str
