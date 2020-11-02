@@ -93,7 +93,7 @@ class RAPLoader(object):
         locations : array
             [(center_lon, center_lat), ...]
         """
-        command = [wgrib2, self.rap_file, "-match", ":[0-9]* hybrid level*", "-s"]
+        command = [wgrib2, self.rap_file, "-s"] # "-match", ":[0-9]* hybrid level*"
         
         for (center_lon, center_lat) in locations:
             if not isinstance(center_lon, str):
@@ -107,18 +107,21 @@ class RAPLoader(object):
         except Exception as e:
             raise e
 
-        pres = np.zeros((len(locations), 50))
-        temp = np.zeros((len(locations), 50))
-        spec = np.zeros((len(locations), 50))
-        height = np.zeros((len(locations), 50))
+        pres = np.zeros((len(locations), 51))
+        temp = np.zeros((len(locations), 51))
+        spec = np.zeros((len(locations), 51))
+        height = np.zeros((len(locations), 51))
         
         lons = np.zeros((len(locations)))
         lats = np.zeros((len(locations)))
         
         for line in values:
             items = line.split(':')
-            index = int(items[4].split('hybrid level')[0]) - 1
-
+            if 'ground' in items[4] or 'surface' in items[4]:
+                index = 0
+            else:
+                index = int(items[4].split('hybrid level')[0])
+                
             for l, loc in enumerate(items[7:]):
                 
                 if lons[l] == 0:

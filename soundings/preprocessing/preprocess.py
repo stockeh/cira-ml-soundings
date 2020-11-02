@@ -443,7 +443,11 @@ def extract_noaa_information():
     with concurrent.futures.ThreadPoolExecutor(max_workers=10) as pool:
         for f in files:
             print('processing:', f)
-            xar = xr.open_dataset(f, decode_times=False)
+            try:
+                xar = xr.open_dataset(f, decode_times=False)
+            except Exception as e:
+                print(e)
+                continue
             rel_times = xar.relTime.values
             
             # should the mask look at other values? e.g., top-sfc > 17,000?

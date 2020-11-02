@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from soundings.deep_learning import mlutilities as ml
 from soundings.plotting import radiosonde_plotting
 
-def plot_altitude_rmse_verticle(nnet, X, T, NWP_Temp, alt=None, file_name=None):
+def plot_altitude_rmse_verticle(nnet, X, T, rap, Y=None, alt=None, file_name=None):
     """
     Plot the RMSE over different altitudes for some NeuralNetwork architecture.
 
@@ -16,7 +16,7 @@ def plot_altitude_rmse_verticle(nnet, X, T, NWP_Temp, alt=None, file_name=None):
         Input to the trained nnet
     T : np.array
         Targets to compare to for the nnet. Will often be the temperature profile from the RAOB.
-    NWP_Temp : np.array
+    rap : np.array
         Temperature profile from the NWP mode. Should have the same shape T.
     alt : np.array
         Altitude profile from the RAOB
@@ -32,10 +32,10 @@ def plot_altitude_rmse_verticle(nnet, X, T, NWP_Temp, alt=None, file_name=None):
         figure_height = 6
         line_width = 2.5
         
-    surface_error = NWP_Temp.shape[1] // 8
+    surface_error = rap.shape[1] // 8
     
     # @OVERRIDE alt
-    alt = np.arange(NWP_Temp.shape[1])
+    alt = np.arange(rap.shape[1])
     rap_color = radiosonde_plotting.DEFAULT_OPTION_DICT[radiosonde_plotting.NWP_LINE_COLOUR_KEY]
     ml_color = radiosonde_plotting.DEFAULT_OPTION_DICT[radiosonde_plotting.PREDICTED_LINE_COLOUR_KEY]
     
@@ -43,25 +43,26 @@ def plot_altitude_rmse_verticle(nnet, X, T, NWP_Temp, alt=None, file_name=None):
     axs = axs.ravel()
     
     # !!! Added for difference between RAP and RAOB
-    # T = copy.copy(T) + NWP_Temp
+    # T = copy.copy(T) + rap
     
-    rap_rmse = np.sqrt((np.mean((NWP_Temp - T)**2, axis=0)))
-    rap_mean_rmse = ml.rmse(NWP_Temp, T)
+    rap_rmse = np.sqrt((np.mean((rap - T)**2, axis=0)))
+    rap_mean_rmse = ml.rmse(rap, T)
     
     axs[0].plot(rap_rmse, alt, color=rap_color, linewidth=line_width)
     axs[0].axvline(rap_mean_rmse, label=f'RAP: {rap_mean_rmse:.3f}',
                    color=rap_color, linestyle='--', linewidth=line_width)
             
-    rap_rmse = np.sqrt((np.mean((NWP_Temp[:, :surface_error] - T[:, :surface_error])**2, axis=0)))
-    rap_mean_rmse = ml.rmse(NWP_Temp[:, :surface_error], T[:, :surface_error])
+    rap_rmse = np.sqrt((np.mean((rap[:, :surface_error] - T[:, :surface_error])**2, axis=0)))
+    rap_mean_rmse = ml.rmse(rap[:, :surface_error], T[:, :surface_error])
 
     axs[1].plot(rap_rmse, alt[:surface_error], color=rap_color, linewidth=line_width)
     axs[1].axvline(rap_mean_rmse, label=f'RAP: {rap_mean_rmse:.3f}',
                    color=rap_color, linestyle='--', linewidth=line_width)
     
     # !!! Added for difference between RAP and RAOB
-    # Y = nnet.use(X) + NWP_Temp
-    Y = nnet.use(X)
+    # Y = nnet.use(X) + rap
+    if Y is None:
+        Y = nnet.use(X)
     
     ml_rmse = np.sqrt((np.mean((Y - T)**2, axis=0)))
     ml_mean_rmse = ml.rmse(Y, T)

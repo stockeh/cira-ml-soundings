@@ -141,7 +141,7 @@ class NeuralNetwork():
                            metrics=[metrics.unstd_mse(self._unstandardizeT),
                                     metrics.unstd_truncated_mse(self._unstandardizeT),
                                     metrics.unstd_rmse(self._unstandardizeT)])
-        callback = [] # [tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=1e-1, patience=10)]
+        callback = [] # [tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=1e-1, patience=10)] if validation is not None else []
         if verbose:
             callback.append(callbacks.TrainLogger(n_epochs, step=n_epochs//5))
 
@@ -356,14 +356,22 @@ class SkipNeuralNetwork(NeuralNetwork):
             Z = tf.keras.layers.UpSampling1D(size=2)(Z)
             Z = tf.keras.layers.Dropout(0.50)(Z)
             # print(Z.shape, skip.output.shape)
+        
+        # final dense layer (linear; no activation)
+        # Z = tf.keras.layers.Dense(n_outputs)(tf.keras.layers.Flatten()(Z))
+        # Y = tf.keras.layers.Add()([X[:,:,1] if X.shape[-1] == 2 else X[:,:,0], Z])    
             
         # final conv layer (linear; no activation)
         Z = tf.keras.layers.Conv1D(
-                1, kernel_size=kernels_size_and_stride[0][0], 
+                len(self.n_outputs), kernel_size=kernels_size_and_stride[0][0], 
                 strides=kernels_size_and_stride[0][1], padding='same')(Z)
-        
+
         # add only the temperature profile back to Z.
-        Y = tf.keras.layers.Flatten()(tf.keras.layers.Add()([X[:,:,1:2] if X.shape[-1] == 2 else X, Z]))
+        if len(self.n_outputs) == 2: # e.g. (256, 2)
+            Y = tf.keras.layers.Add()([X[:,:,1:3], Z])
+        else: # e.g. (256)
+            Y = tf.keras.layers.Flatten()(tf.keras.layers.Add()([X[:,:,1:2] if X.shape[-1] == 2 else X, Z]))
+
         self.model = tf.keras.Model(inputs=X, outputs=Y)
 
         self.Xmeans = None
@@ -532,7 +540,7 @@ class MultiNeuralNetwork():
 
         callback = [tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=1e-5, patience=10)] if validation is not None else []
         if verbose:
-            callback.append(callbacks.TrainLogger(n_epochs, step=5))
+            callback.append(callbacks.TrainLogger(n_epochs, step=n_epochs//5))
 
         start_time = time.time()
         self.history = self.model.fit({'im': im, 'rap': rap}, {'out': raob},
