@@ -115,7 +115,7 @@ def plot_loss(nnet):
         radiosonde_plotting.PREDICTED_LINE_COLOUR_KEY]
     
     fig, ax = plt.subplots(1, figsize=(8, 4))
-    ax.plot(nnet.history['rmse'], color=train_color, label='train')
-    ax.plot(nnet.history['val_rmse'], color=val_color, label='val')
-    ax.set_xlabel('Epoch'); ax.set_ylabel('RMSE [C]')
+    ax.plot(nnet.history['root_mean_squared_error'], color=train_color, label='train')
+    ax.plot(nnet.history['val_root_mean_squared_error'], color=val_color, label='val')
+    ax.set_xlabel('Epoch'); ax.set_ylabel('RMSE')
     ax.legend();

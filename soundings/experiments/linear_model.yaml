@@ -1,0 +1,29 @@
+results_file: /mnt/data1/stock/mlsoundings/results/linear_model_temperature_dewpoint.csv
+model:
+    network: NeuralNetwork
+    n_hiddens_list:
+        - [0]
+    optimizers: [adam, Adadelta]
+    learning_rates: [0.0001, 0.001, 0.01]
+    activations: [None]
+    losses: [MSE, MAE]
+    epochs: [10, 25, 50]
+    batch_sizes: [32, 64, 128]
+    dropout: [None]
+    batchnorm: [None]
+data:
+    saved_f: /mnt/data1/stock/mlsoundings/preprocessed.npz
+    rap:
+        input_dims: 
+            - [0, 1, 2, 3] # pressure, temperature, dewpoint, altitude
+        output_dims: 
+            - [1, 2] # temperature, dewpoint
+    rtma:
+        input_channels:
+            - 0 # lpi
+            - 1 # lri
+            - 2 # ...
+    goes:
+        input_channels:
+            - 0 # 8
+            - 1 # 9

@@ -8,9 +8,9 @@ class TrainLogger(tf.keras.callbacks.Callback):
 
     def on_epoch_end(self, epoch, logs=None):
 
-        s = f"epoch: {epoch}, rmse {logs['rmse']:7.5f}"
-        if 'val_rmse' in logs:
-            s += f", val_rmse {logs['val_rmse']:7.5f}"
+        s = f"epoch: {epoch}, rmse {logs['root_mean_squared_error']:7.5f}"
+        if 'val_root_mean_squared_error' in logs:
+            s += f", val_rmse {logs['val_root_mean_squared_error']:7.5f}"
          #rmse {logs['rmse']:7.5f}, sfc_rmse {logs['sfc_rmse']:7.5f}, "
          #f"val_rmse {logs['val_rmse']:7.5f}, val_sfc_rmse {logs['val_sfc_rmse']:7.5f}")
         if epoch % self.step == 0:

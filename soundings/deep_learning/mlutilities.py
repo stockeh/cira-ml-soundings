@@ -27,7 +27,49 @@ def rmse(A, B):
 ######################################################################
 
 
-def partition(X, T, percentages, shuffle=False):
+def parition_all(rap=None, raob=None, goes=None, rtma=None, 
+                 percentages=(0.75,0.10,0.15), shuffle=False, seed=1234):
+    
+    trainFraction, testFraction = percentages
+    n = raob.shape[0]
+    nTrain = round(trainFraction * n)
+    nTest = round(testFraction * n)
+    rowIndices = np.arange(n)
+    
+    if shuffle:
+        np.random.seed(seed)
+        np.random.shuffle(rowIndices)
+        
+    RAPtrain  = None
+    RAPtest   = None
+    RAOBtrain = None
+    RAOBtest  = None
+    GOEStrain = None
+    GOEStest  = None
+    RTMAtrain = None
+    RTMAtest  = None
+    
+    if rap is not None:
+        RAPtrain = rap[rowIndices[:nTrain], :]
+        RAPtest  = rap[rowIndices[nTrain:nTrain+nTest], :]
+        
+    if raob is not None:
+        RAOBtrain = raob[rowIndices[:nTrain], :]
+        RAOBtest  = raob[rowIndices[nTrain:nTrain+nTest], :]
+        
+    if goes is not None:
+        GOEStrain = goes[rowIndices[:nTrain], :]
+        GOEStest  = goes[rowIndices[nTrain:nTrain+nTest], :]
+        
+    if rtma is not None:
+        RTMAtrain = rtma[rowIndices[:nTrain], :]
+        RTMAtest  = rtma[rowIndices[nTrain:nTrain+nTest], :]
+    
+    return (RAPtrain, RAOBtrain, GOEStrain, RTMAtrain,
+            RAPtest, RAOBtest, GOEStest, RTMAtest)
+
+
+def partition(X, T, percentages, shuffle=False, seed=1234):
     """Usage: Xtrain,Train,Xvalidate,Tvalidate,Xtest,Ttest = partition(X,T,(0.6,0.2,0.2),shuffle=False,classification=True)
       X is nSamples x nFeatures. 
       percentages can have just two values, for partitioning into train and test only
@@ -49,6 +91,7 @@ def partition(X, T, percentages, shuffle=False):
 
     rowIndices = np.arange(X.shape[0])
     if shuffle:
+        np.random.seed(seed)
         np.random.shuffle(rowIndices)
 
     # regression, so do not partition according to targets.

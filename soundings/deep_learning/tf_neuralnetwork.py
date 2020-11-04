@@ -26,7 +26,8 @@ def loadnn(path):
 
 
 class NeuralNetwork():
-    def __init__(self, n_inputs, n_hiddens_list, n_outputs, activation='tanh', seed=None):
+    def __init__(self, n_inputs, n_hiddens_list, n_outputs, activation='tanh',
+                 batchnorm=False, dropout=False, seed=None):
 
         if not isinstance(n_hiddens_list, list):
             raise Exception(
@@ -44,9 +45,11 @@ class NeuralNetwork():
         if not (n_hiddens_list == [] or n_hiddens_list == [0]):
             for i, units in enumerate(n_hiddens_list):
                 Z = tf.keras.layers.Dense(units)(Z)
-                # Z = tf.keras.layers.BatchNormalization()(Z)
+                if batchnorm:
+                    Z = tf.keras.layers.BatchNormalization()(Z)
                 Z = tf.keras.layers.Activation(activation)(Z)
-                # Z = tf.keras.layers.Dropout(0.2)(Z)
+                if dropout:
+                    Z = tf.keras.layers.Dropout(0.2)(Z)
         Y = tf.keras.layers.Dense(n_outputs)(Z)
         self.model = tf.keras.Model(inputs=X, outputs=Y)
 
@@ -104,7 +107,7 @@ class NeuralNetwork():
         return self.Tstds * Ts + self.Tmeans
 
     def train(self, X, T, n_epochs, batch_size, method='sgd',
-              verbose=False, learning_rate=0.001, validation=None, loss_f=None):
+              verbose=False, learning_rate=0.001, validation=None, loss_f='MSE'):
         """Use Keras Functional API to train model"""
 
         self._set_seed()
@@ -135,13 +138,23 @@ class NeuralNetwork():
             raise Exception(
                 "train: method={method} not a valid optimizer in soundings.nn library.")
 
-        loss = tf.keras.losses.MSE if loss_f == None else loss_f
-
+            
+        if loss_f == 'MSE': # default
+            loss = tf.keras.losses.MSE
+        elif loss_f == 'MAE':
+            loss = tf.keras.losses.MAE
+        else: # custom loss function
+            loss = loss_f
+            
         self.model.compile(optimizer=algo, loss=loss,
-                           metrics=[metrics.unstd_mse(self._unstandardizeT),
-                                    metrics.unstd_truncated_mse(self._unstandardizeT),
-                                    metrics.unstd_rmse(self._unstandardizeT)])
-        callback = [] # [tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=1e-1, patience=10)] if validation is not None else []
+                           metrics=[tf.keras.metrics.RootMeanSquaredError(),
+                                    tf.keras.metrics.MeanSquaredError(),
+                                    tf.keras.metrics.MeanAbsoluteError()])
+                           # metrics=[metrics.unstd_mse(self._unstandardizeT),
+                           #         metrics.unstd_truncated_mse(self._unstandardizeT),
+                           #         metrics.unstd_rmse(self._unstandardizeT)])
+        callback = [] 
+        # [tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=1e-1, patience=10)] if validation is not None else []
         if verbose:
             callback.append(callbacks.TrainLogger(n_epochs, step=n_epochs//5))
 
@@ -198,7 +211,7 @@ class ConvolutionalNeuralNetwork(NeuralNetwork):
         X = Z = tf.keras.Input(shape=n_inputs)
         for (kernel, stride), units in zip(kernels_size_and_stride, n_units_in_conv_layers):
             Z = tf.keras.layers.Conv1D(
-                units, kernel_size=kernel, strides=stride, activation=activation, padding='same')(Z)
+                units, kernel_size=kernel, strides=stride, padding='same')(Z)
             Z = tf.keras.layers.BatchNormalization()(Z)
             Z = tf.keras.layers.Activation(activation)(Z)
             Z = tf.keras.layers.MaxPooling1D(pool_size=2)(Z)
@@ -340,7 +353,7 @@ class SkipNeuralNetwork(NeuralNetwork):
                 n_units_in_conv_layers[-1], 
                 kernel_size=kernels_size_and_stride[-1][0], 
                 strides=kernels_size_and_stride[-1][1], 
-                padding='same')(Z)
+                padding='same', name='bottleneck')(Z)
         Z = tf.keras.layers.LeakyReLU(alpha=0.2)(Z)
         Z = tf.keras.layers.Dropout(0.50)(Z)
         
@@ -355,7 +368,6 @@ class SkipNeuralNetwork(NeuralNetwork):
             Z = tf.keras.layers.Concatenate(axis=2)([Z, skip.output])
             Z = tf.keras.layers.UpSampling1D(size=2)(Z)
             Z = tf.keras.layers.Dropout(0.50)(Z)
-            # print(Z.shape, skip.output.shape)
         
         # final dense layer (linear; no activation)
         # Z = tf.keras.layers.Dense(n_outputs)(tf.keras.layers.Flatten()(Z))
@@ -391,7 +403,194 @@ class SkipNeuralNetwork(NeuralNetwork):
         return str
 
 
+class MultiSkipNetwork():
+    def __init__(self, n_rap_inputs, n_goes_inputs, n_rtma_inputs,
+                 n_units_in_conv_layers, kernels_size_and_stride,
+                 n_outputs, seed=None):
+        
+        assert ((len(n_rap_inputs) == 2)), f'RAP must be VxC dimensions, {n_rap_inputs}'
+        assert ((len(n_rtma_inputs) == 3)), f'RTMA must be HxWxC dimensions, {n_rtma_inputs}'
+        assert ((len(n_goes_inputs) == 3)), f'GOES must be HxWxC dimensions, {n_rap_inputs}'
+        assert (isinstance(n_units_in_conv_layers, list)), f'{type(self).__name__}: n_units_in_conv_layers must be a list.'
+        assert (isinstance(kernels_size_and_stride, list)), f'{type(self).__name__}: kernels_size_and_stride must be a list.'
 
+        self.seed = seed
+        self._set_seed()
+        tf.keras.backend.clear_session()
+
+        self.n_rap_inputs = n_rap_inputs
+        self.n_rtma_inputs = n_rtma_inputs
+        self.n_goes_inputs = n_goes_inputs
+        self.n_units_in_conv_layers = n_units_in_conv_layers
+        self.kernels_size_and_stride = kernels_size_and_stride
+        self.n_outputs = n_outputs   
+        
+        X_RAP  = tf.keras.Input(shape=n_rap_inputs, name='rap')
+        X_RTMA = tf.keras.Input(shape=n_rtma_inputs, name='rtma')
+        X_GOES = tf.keras.Input(shape=n_goes_inputs, name='goes')
+        
+        
+        
+        
+        self.RAPmeans = None
+        self.RAPstds = None
+        self.RTMAmeans = None
+        self.RTMAstds = None
+        self.GOESmeans = None
+        self.GOESstds = None
+        self.RAOBmeans = None
+        self.RAOBstds = None
+
+        self.history = None
+        self.training_time = None
+
+    def __repr__(self):
+        str = f'{type(self).__name__}({self.n_outputs})'
+        if self.history:
+            str += f"\n  Final objective value is {self.history['loss'][-1]:.5f} in {self.training_time:.4f} seconds."
+        else:
+            str += '  Network is not trained.'
+        return str
+
+    def _set_seed(self):
+        if self.seed:
+            np.random.seed(self.seed)
+            random.seed(self.seed)
+            tf.random.set_seed(self.seed)
+
+    def _setup_standardize(self, rap, rtma, goes, raob):
+        if self.RAPmeans is None:
+            self.RAPmeans = rap.mean(axis=0)
+            self.RAPstds = rap.std(axis=0)
+            self.RAPconstant = self.RAPstds == 0
+            self.RAPstdsFixed = copy.copy(self.RAPstds)
+            self.RAPstdsFixed[self.RAPconstant] = 1
+        
+        if self.RTMAmeans is None:
+            self.RTMAmeans = rtma.mean(axis=0)
+            self.RTMAstds = rtma.std(axis=0)
+            self.RTMAconstant = self.RTMAstds == 0
+            self.RTMAstdsFixed = copy.copy(self.RTMAstds)
+            self.RTMAstdsFixed[self.RTMAconstant] = 1
+            
+        if self.GOESmeans is None:
+            self.GOESmeans = rtma.mean(axis=0)
+            self.GOESstds = rtma.std(axis=0)
+            self.GOESconstant = self.GOESstds == 0
+            self.GOESstdsFixed = copy.copy(self.GOESstds)
+            self.GOESstdsFixed[self.GOESconstant] = 1
+            
+        if self.RAOBmeans is None:
+            self.RAOBmeans = raob.mean(axis=0)
+            self.RAOBstds = raob.std(axis=0)
+            self.RAOBconstant = self.RAOBstds == 0
+            self.RAOBstdsFixed = copy.copy(self.RAOBstds)
+            self.RAOBstdsFixed[self.RAOBconstant] = 1
+
+    def _standardizeRAP(self, rap):
+        result = (rap - self.RAPmeans) / self.RAPstdsFixed
+        result[:, self.RAPconstant] = 0.0
+        return result
+
+    def _unstandardizeRAP(self, rap):
+        return self.RAPstds * rap + self.RAPmeans
+
+    def _standardizeRTMA(self, rtma):
+        result = (rtma - self.RTMAmeans) / self.RTMAstdsFixed
+        result[:, self.RTMAconstant] = 0.0
+        return result
+
+    def _unstandardizeRTMA(self, rtma):
+        return self.RTMAstds * rtma + self.RTMAmeans
+    
+    def _standardizeGOES(self, goes):
+        result = (goes - self.GOESmeans) / self.GOESstdsFixed
+        result[:, self.GOESconstant] = 0.0
+        return result
+
+    def _unstandardizeGOES(self, goes):
+        return self.GOESstds * goes + self.GOESmeans
+    
+    def _standardizeRAOB(self, raob):
+        result = (raob - self.RAOBmeans) / self.RAOBstdsFixed
+        result[:, self.RAOBconstant] = 0.0
+        return result
+
+    def _unstandardizeRAOB(self, raob):
+        return self.RAOBstds * raob + self.RAOBmeans
+
+    def train(self, rap, rtma, goes, raob, n_epochs, batch_size, method='sgd',
+              verbose=False, learning_rate=0.001, validation=None, loss_f=None):
+        """Use Keras Functional API to train model"""
+
+        self._set_seed()
+        self._setup_standardize(rap, rtma, goes, raob)
+
+        rap  = self._standardizeRAP(rap)
+        rtma = self._standardizeRTMA(rtma)
+        goes = self._standardizeGOES(goes)
+        raob = self._standardizeRAOB(raob)
+
+        if validation is not None:
+            try:
+                validation = ({'rap': self._standardizeRAP(validation[0]),
+                               'rtma': self._standardizeRTMA(validation[1]),
+                               'goes': self._standardizeGOES(validation[2])},
+                              self._standardizeRAOB(validation[3]))
+            except:
+                raise TypeError(
+                    f'validation must be of the following shape: (rap, rtma, goes, raob)')
+
+        try:
+            if method == 'sgd':
+                algo = tf.keras.optimizers.SGD(learning_rate=learning_rate)
+            elif method == 'adam':
+                algo = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+        except:
+            raise Exception(
+                "train: method={method} not one of 'scg' or 'adam'")
+
+        loss = tf.keras.losses.MSE if loss_f == None else loss_f
+        self.model.compile(optimizer=algo, loss=loss,
+                           metrics=[tf.keras.metrics.RootMeanSquaredError(),
+                                    metrics.unstd_rmse(self._unstandardizeRAOB)])
+
+        callback = [tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=1e-5, patience=10)] if validation is not None else []
+        if verbose:
+            callback.append(callbacks.TrainLogger(n_epochs, step=n_epochs//5))
+
+        start_time = time.time()
+        self.history = self.model.fit({'rap': rap, 'rtma': rtma, 'goes': goes}, {'out': raob},
+                                      batch_size=batch_size, epochs=n_epochs, verbose=0,
+                                      callbacks=callback, validation_data=validation).history
+        self.training_time = time.time() - start_time
+        return self
+
+    def use(self, X):
+        """
+        ---
+        params:
+            X : {'rap': rap, 'rtma': rtma, 'goes': goes}
+        return:
+            Y : unstandardized RAOB
+        """
+        # Set to error logging after model is trained
+        tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
+        rap = self._standardizeRAP(X['rap'])
+        rtma = self._standardizeRTMA(X['rtma'])
+        goes = self._standardizeGOES(X['goes'])
+        Y = self._unstandardizeRAOB(self.model.predict({'rap': rap, 'rtma': rtma, 'goes': goes}))
+        return Y
+
+    def save(self, path):
+        self.model.save(path)
+        del self.model
+        with open(path + '/class.pickle', 'wb') as f:
+            pickle.dump(self, f)
+        self.model = tf.keras.models.load_model(path)
+
+
+        
 class MultiNeuralNetwork():
     def __init__(self, n_im_inputs, n_rap_inputs, im_hiddens_list,
                  n_units_in_conv_layers, kernels_size_and_stride,
