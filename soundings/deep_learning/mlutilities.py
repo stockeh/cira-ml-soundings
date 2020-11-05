@@ -26,14 +26,37 @@ def rmse(A, B):
 
 ######################################################################
 
-
 def parition_all(rap=None, raob=None, goes=None, rtma=None, 
                  percentages=(0.75,0.10,0.15), shuffle=False, seed=1234):
+    """
+    ---
+    params:
+        percentages : list
+            (train, validation, test)
+    """
     
-    trainFraction, testFraction = percentages
+    validateFraction = 0
+    if isinstance(percentages, (tuple, list)):
+        trainFraction = percentages[0]
+        testFraction = percentages[-1]
+        if len(percentages) == 3:
+            validateFraction = percentages[1]
+
+    elif isinstance(percentages, float):
+        trainFraction = percentages
+        testFraction = 1 - trainFraction
+
+    else:
+        raise TypeError(
+            f'percentages {percentages} must be of the following (train, val, test) or 0.8 for train')
+    
     n = raob.shape[0]
     nTrain = round(trainFraction * n)
+    nValidate = round(validateFraction * n)
     nTest = round(testFraction * n)
+    if nTrain + nValidate + nTest > n:
+        nTest = n - nTrain - nValidate
+        
     rowIndices = np.arange(n)
     
     if shuffle:
@@ -41,32 +64,55 @@ def parition_all(rap=None, raob=None, goes=None, rtma=None,
         np.random.shuffle(rowIndices)
         
     RAPtrain  = None
+    RAPval    = None
     RAPtest   = None
-    RAOBtrain = None
-    RAOBtest  = None
-    GOEStrain = None
-    GOEStest  = None
+        
     RTMAtrain = None
+    RTMAval   = None
     RTMAtest  = None
+
+    GOEStrain = None
+    GOESval   = None
+    GOEStest  = None
+    
+    RAOBtrain = None
+    RAOBval   = None
+    RAOBtest  = None
     
     if rap is not None:
         RAPtrain = rap[rowIndices[:nTrain], :]
-        RAPtest  = rap[rowIndices[nTrain:nTrain+nTest], :]
-        
-    if raob is not None:
-        RAOBtrain = raob[rowIndices[:nTrain], :]
-        RAOBtest  = raob[rowIndices[nTrain:nTrain+nTest], :]
+        if nValidate > 0:
+            RAPval = rap[rowIndices[nTrain:nTrain+nValidate], :]
+        RAPtest = rap[rowIndices[nTrain+nValidate:nTrain+nValidate+nTest], :]
+           
+    if rtma is not None:
+        RTMAtrain = rtma[rowIndices[:nTrain], :]
+        if nValidate > 0:
+            RTMAval = rtma[rowIndices[nTrain:nTrain+nValidate], :]
+        RTMAtest = rtma[rowIndices[nTrain+nValidate:nTrain+nValidate+nTest], :]
         
     if goes is not None:
         GOEStrain = goes[rowIndices[:nTrain], :]
-        GOEStest  = goes[rowIndices[nTrain:nTrain+nTest], :]
+        if nValidate > 0:
+            GOESval = goes[rowIndices[nTrain:nTrain+nValidate], :]
+        GOEStest = goes[rowIndices[nTrain+nValidate:nTrain+nValidate+nTest], :]
+
+    if raob is not None:
+        RAOBtrain = raob[rowIndices[:nTrain], :]
+        if nValidate > 0:
+            RAOBval = raob[rowIndices[nTrain:nTrain+nValidate], :]
+        RAOBtest = raob[rowIndices[nTrain+nValidate:nTrain+nValidate+nTest], :]
         
-    if rtma is not None:
-        RTMAtrain = rtma[rowIndices[:nTrain], :]
-        RTMAtest  = rtma[rowIndices[nTrain:nTrain+nTest], :]
-    
-    return (RAPtrain, RAOBtrain, GOEStrain, RTMAtrain,
-            RAPtest, RAOBtest, GOEStest, RTMAtest)
+    if nValidate > 0:
+        return (RAPtrain, RAPval, RAPtest,
+                RTMAtrain, RTMAval, RTMAtest,
+                GOEStrain, GOESval, GOEStest,
+                RAOBtrain, RAOBval, RAOBtest)
+
+    return (RAPtrain, RAPtest,
+            RTMAtrain, RTMAtest,
+            GOEStrain, GOEStest,
+            RAOBtrain, RAOBtest)
 
 
 def partition(X, T, percentages, shuffle=False, seed=1234):
@@ -77,9 +123,9 @@ def partition(X, T, percentages, shuffle=False, seed=1234):
     validateFraction = 0
     if isinstance(percentages, (tuple, list)):
         trainFraction = percentages[0]
-        testFraction = percentages[1]
+        testFraction = percentages[-1]
         if len(percentages) == 3:
-            validateFraction = percentages[2]
+            validateFraction = percentages[1]
 
     elif isinstance(percentages, float):
         trainFraction = percentages

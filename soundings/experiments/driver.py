@@ -12,13 +12,12 @@ from soundings.deep_learning import mlutilities as ml
 from soundings.deep_learning import tf_neuralnetwork as nn
 from soundings.experiments import experiment_interface as ei
 
-def save_results(config, results, driver):
+def save_results(config: dict, results, driver):
     results.to_csv(config['results_file'], index=False)
     print('INFO: Results Saved!')
 
           
-def experiment(config, network_name, data):
-    Xtrain, Ttrain, Xval, Tval, Xtest, Ttest = data
+def experiment(config: dict, network_name: str, data: tuple):
     if network_name in ['NeuralNetwork']:
         driver = ei.NeuralNetworkDriver()
     elif network_name in ['Convolutional']:
@@ -26,31 +25,35 @@ def experiment(config, network_name, data):
     else:
         raise ValueError(f'{network_name} not a valid type.')
     
-    experiments = driver.get_experiemnts(config)
-    results = driver.run_experiments(config, experiments, Xtrain, Ttrain, Xval, Tval, Xtest, Ttest)
+    network_experiments, data_experiments = driver.get_experiemnts(config)
+    results = driver.run_experiments(config, network_experiments, data_experiments, data)
     
     return results, driver
 
 
-def load_data(config, network_name):
+def load_data(config: dict, network_name: str) -> tuple:
+    """Assumes all NaNs are removed prior"""
     container = np.load(config['data']['saved_f'])
     raob = container['raob']
     rap  = container['rap']
     goes = container['goes']
     rtma = container['rtma']
-    sonde_files = container['sonde_files']
+    sonde_files = container['sonde_files'] # is this needed now?
+    
     print(f'INFO: total data shape -- {raob.shape}, {rap.shape}, {goes.shape}, {rtma.shape}')
     
-    if network_name not in ['MultiNeuralNetwork', 'MultiSkipNetwork']:
-        Xtrain, Ttrain, Xval, Tval, Xtest, Ttest = ml.partition(rap, raob, (0.75, 0.10, 0.15),
-                                                                shuffle=True, seed=1234)
-    else:
-        raise ValueError('Need to support GOES & RTMA partitioning')
-        
-    return (Xtrain, Ttrain, Xval, Tval, Xtest, Ttest)
+    (RAPtrain, RAPval, RAPtest,
+     RTMAtrain, RTMAval, RTMAtest,
+     GOEStrain, GOESval, GOEStest,
+     RAOBtrain, RAOBval, RAOBtest) = ml.parition_all(rap=rap, raob=raob, goes=goes, rtma=rtma, 
+                                                     percentages=(0.75,0.15,0.10), shuffle=False, seed=1234)
+    
+    print(f'INFO: partitioned data shape -- train: {RAPtrain.shape[0]}, val: {RAPval.shape[0]}, test: {RAPtest.shape[0]}')
+    return (RAPtrain, RAPval, RAPtest, RTMAtrain, RTMAval, RTMAtest,
+            GOEStrain, GOESval, GOEStest, RAOBtrain, RAOBval, RAOBtest)
 
 
-def main(config_path):
+def main(config_path: str):
     global config
 
     np.set_printoptions(threshold=sys.maxsize)
