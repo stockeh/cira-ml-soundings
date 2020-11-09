@@ -4,6 +4,76 @@ import matplotlib.pyplot as plt
 from soundings.deep_learning import mlutilities as ml
 from soundings.plotting import radiosonde_plotting
 
+def plot_altitude_rmse_verticle_2(ml_rmse, ml_mean_rmse, rap_rmse, rap_mean_rmse, file_name=None):
+    """
+    Plot the RMSE over different altitudes for some NeuralNetwork architecture.
+
+    :params
+    ---
+    nnet : class
+        Trained Neural Network class that will be used for evaluation
+    X : np.array
+        Input to the trained nnet
+    T : np.array
+        Targets to compare to for the nnet. Will often be the temperature profile from the RAOB.
+    rap : np.array
+        Temperature profile from the NWP mode. Should have the same shape T.
+    alt : np.array
+        Altitude profile from the RAOB
+    """
+    default_font = 12
+    figure_width = 6
+    figure_height = 6
+    line_width = 2
+    
+    if file_name:
+        default_font = 14
+        figure_width = 10
+        figure_height = 6
+        line_width = 2.5
+        
+    # @OVERRIDE alt
+    alt = np.arange(ml_rmse.shape[0])
+    rap_color = radiosonde_plotting.DEFAULT_OPTION_DICT[radiosonde_plotting.NWP_LINE_COLOUR_KEY]
+    ml_color = radiosonde_plotting.DEFAULT_OPTION_DICT[radiosonde_plotting.PREDICTED_LINE_COLOUR_KEY]
+    
+    fig, axs = plt.subplots(1, 1, figsize=(figure_width, figure_height))
+    
+    axs.plot(rap_rmse, alt, color=rap_color, linewidth=line_width)
+    axs.axvline(rap_mean_rmse, label=f'RAP: {rap_mean_rmse:.3f}',
+                   color=rap_color, linestyle='--', linewidth=line_width)
+            
+    axs.plot(ml_rmse, alt, color=ml_color, linewidth=line_width)
+    axs.axvline(ml_mean_rmse, label=f'ML: {ml_mean_rmse:.3f}',
+                   color=ml_color, linestyle='--', linewidth=line_width)
+    
+    axs.set_ylabel('Altitude', fontsize=default_font)
+    axs.set_xlabel('RMSE [C]', fontsize=default_font)
+    axs.legend(fontsize=default_font)
+    
+    n_ticks = 5
+    if len(alt) > 50:
+        axs.set_yticks(np.linspace(alt.min(), alt.max(), n_ticks))
+        axs.set_yticklabels(['sfc'] + ['']*(n_ticks-2) + ['top'])
+        for i, label in enumerate(axs.get_yticklabels()):
+            if i > 0 and i < len(axs.get_yticklabels()) - 1:
+                label.set_visible(False) 
+    else:
+        axs.set_yticks(np.linspace(alt.min(), alt.max(), n_ticks))
+        axs.set_yticklabels(['sfc'] + ['']*(n_ticks-2) + ['${1}/{n}^{th}$'])
+        for i, label in enumerate(axs.get_yticklabels()):
+            if i > 0 and i < len(axs.get_yticklabels()) - 1:
+                label.set_visible(False) 
+    
+    axs.tick_params(axis='x', labelsize=default_font)
+    axs.tick_params(axis='y', labelsize=default_font)
+    axs.grid(True)
+    
+    if file_name:
+        plt.savefig(file_name, dpi=300)
+        plt.show()
+        plt.close()
+
 def plot_altitude_rmse_verticle(nnet, X, T, rap, Y=None, alt=None, file_name=None):
     """
     Plot the RMSE over different altitudes for some NeuralNetwork architecture.

@@ -1,4 +1,4 @@
-results_file: /mnt/data1/stock/mlsoundings/results/fully_connected_model_temperature_dewpoint.csv
+results_file: /mnt/data1/stock/mlsoundings/results/fully_connected_model_temperature_dewpoint_2.csv
 model:
     network: NeuralNetwork
     n_hiddens_list:
@@ -17,8 +17,8 @@ model:
     losses: [MSE, MAE]
     epochs: [50]
     batch_sizes: [128]
-    dropout: [False]
-    batchnorm: [False]
+    dropout: [True]
+    batchnorm: [True]
 data:
     saved_f: /mnt/data1/stock/mlsoundings/preprocessed.npz
     rap:
