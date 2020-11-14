@@ -189,7 +189,7 @@ class NeuralNetwork():
 class ConvolutionalNeuralNetwork(NeuralNetwork):
     def __init__(self, n_inputs, n_units_in_conv_layers,
                  kernels_size_and_stride, n_outputs, activation='tanh',
-                 dropout=False, seed=None):
+                 batchnorm=False, dropout=False, seed=None):
 
         if not isinstance(n_units_in_conv_layers, (list, tuple)):
             raise Exception(
@@ -212,7 +212,8 @@ class ConvolutionalNeuralNetwork(NeuralNetwork):
         for (kernel, stride), units in zip(kernels_size_and_stride, n_units_in_conv_layers):
             Z = tf.keras.layers.Conv1D(
                 units, kernel_size=kernel, strides=stride, padding='same')(Z)
-            Z = tf.keras.layers.BatchNormalization()(Z)
+            if batchnorm:
+                Z = tf.keras.layers.BatchNormalization()(Z)
             Z = tf.keras.layers.Activation(activation)(Z)
             Z = tf.keras.layers.MaxPooling1D(pool_size=2)(Z)
             if dropout:
@@ -576,7 +577,7 @@ class MultiSkipNetwork():
         """
         # Set to error logging after model is trained
         tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
-        rap = self._standardizeRAP(X['rap'])
+        rap  = self._standardizeRAP(X['rap'])
         rtma = self._standardizeRTMA(X['rtma'])
         goes = self._standardizeGOES(X['goes'])
         Y = self._unstandardizeRAOB(self.model.predict({'rap': rap, 'rtma': rtma, 'goes': goes}))
@@ -591,13 +592,18 @@ class MultiSkipNetwork():
 
 
         
-class MultiNeuralNetwork():
-    def __init__(self, n_im_inputs, n_rap_inputs, im_hiddens_list,
+class MultiConvolutionalNeuralNetwork():
+    """Convolutional Neural Network with multiple inputs (optionally).
+    Specify, `n_im_inputs=None` to not add additional inputs.
+    """
+    def __init__(self, n_rap_inputs, n_im_inputs, n_hiddens_list,
                  n_units_in_conv_layers, kernels_size_and_stride,
-                 n_outputs, im_activation='tanh', rap_activation='relu', seed=None):
+                 n_outputs, rap_activation='relu', dense_activation='tanh', 
+                 batchnorm=False, dropout=False, seed=None):
 
-        assert ((len(n_im_inputs) == 3)), f'Image must be HxWxC dimensions, {n_im_inputs}'
-        assert (isinstance(im_hiddens_list, list)), f'{type(self).__name__}: im_hiddens_list must be a list.'
+        if n_im_inputs is not None:
+            assert ((len(n_im_inputs) == 3)), f'Image must be HxWxC dimensions, {n_im_inputs}'
+        assert (isinstance(n_hiddens_list, list)), f'{type(self).__name__}: n_hiddens_list must be a list.'
         assert (isinstance(n_units_in_conv_layers, list)), f'{type(self).__name__}: n_units_in_conv_layers must be a list.'
         assert (isinstance(kernels_size_and_stride, list)), f'{type(self).__name__}: kernels_size_and_stride must be a list.'
 
@@ -605,41 +611,51 @@ class MultiNeuralNetwork():
         self._set_seed()
         tf.keras.backend.clear_session()
 
-        self.n_im_inputs = n_im_inputs
         self.n_rap_inputs = n_rap_inputs
-        self.im_hiddens_list = im_hiddens_list
-        self.n_units_in_conv_layers = n_units_in_conv_layers
+        self.n_im_inputs  = n_im_inputs
+        self.n_hiddens_list = n_hiddens_list
+        self.n_units_in_conv_layers  = n_units_in_conv_layers
         self.kernels_size_and_stride = kernels_size_and_stride
         self.n_outputs = n_outputs
-
-        # IM Input
-        X1 = tf.keras.Input(shape=n_im_inputs, name='im')
-        Z1 = tf.keras.layers.Flatten()(X1)
-
-        if not (im_hiddens_list == [] or im_hiddens_list == [0]):
-            for units in im_hiddens_list:
-                Z1 = tf.keras.layers.Dense(units, activation=im_activation)(Z1)
-
+        
         # RAP Input
-        X2 = Z2 = tf.keras.Input(shape=n_rap_inputs, name='rap')
+        X1 = Z1 = tf.keras.Input(shape=n_rap_inputs, name='rap')
 
         for (kernel, stride), units in zip(kernels_size_and_stride, n_units_in_conv_layers):
-            Z2 = tf.keras.layers.Conv1D(units, kernel_size=kernel, strides=stride,
-                                       activation=rap_activation, padding='same')(Z2)
-            Z2 = tf.keras.layers.MaxPooling1D(pool_size=2)(Z2)
-        Z2 = tf.keras.layers.Flatten()(Z2)
+            Z1 = tf.keras.layers.Conv1D(units, kernel_size=kernel, strides=stride, padding='same')(Z1)
+            if batchnorm:
+                Z1 = tf.keras.layers.BatchNormalization()(Z1)
+            Z1 = tf.keras.layers.Activation(rap_activation)(Z1)
+            Z1 = tf.keras.layers.MaxPooling1D(pool_size=2)(Z1)
+        Z1 = tf.keras.layers.Flatten()(Z1)
 
-        # Join IM + RAP
-        Z = tf.keras.layers.Concatenate(axis=1)([Z1, Z2])
+        # IM Input
+        if self.n_im_inputs is not None:
+            X2 = tf.keras.Input(shape=n_im_inputs, name='im')
+            Z2 = tf.keras.layers.Flatten()(X2)
+            Z  = tf.keras.layers.Concatenate(axis=1)([Z1, Z2]) # Join IM & RAP
+            inputs = [X1, X2]
+        else:
+            Z = Z1
+            inputs = X1
+                
+        # Dense Layers 
+        if not (n_hiddens_list == [] or n_hiddens_list == [0]):
+            for units in n_hiddens_list:
+                if dropout:
+                    Z = tf.keras.layers.Dropout(0.2)(Z) 
+                Z = tf.keras.layers.Dense(units, activation=dense_activation,
+                                          kernel_regularizer=tf.keras.regularizers.l2(0.00001))(Z) 
+                # kernel_regularizer=tf.keras.regularizers.l2(0.0001)
         Y = tf.keras.layers.Dense(n_outputs, name='out')(Z)
-        self.model = tf.keras.Model(inputs=[X1, X2], outputs=Y)
+        self.model = tf.keras.Model(inputs=inputs, outputs=Y)            
 
-        self.IMmeans = None
-        self.IMstds = None
-        self.RAPmeans = None
-        self.RAPstds = None
+        self.RAPmeans  = None
+        self.RAPstds   = None
+        self.IMmeans   = None
+        self.IMstds    = None
         self.RAOBmeans = None
-        self.RAOBstds = None
+        self.RAOBstds  = None
 
         self.history = None
         self.training_time = None
@@ -658,14 +674,7 @@ class MultiNeuralNetwork():
             random.seed(self.seed)
             tf.random.set_seed(self.seed)
 
-    def _setup_standardize(self, im, rap, raob):
-        if self.IMmeans is None:
-            self.IMmeans = im.mean(axis=0)
-            self.IMstds = im.std(axis=0)
-            self.IMconstant = self.IMstds == 0
-            self.IMstdsFixed = copy.copy(self.IMstds)
-            self.IMstdsFixed[self.IMconstant] = 1
-
+    def _setup_standardize(self, rap, im, raob):
         if self.RAPmeans is None:
             self.RAPmeans = rap.mean(axis=0)
             self.RAPstds = rap.std(axis=0)
@@ -673,20 +682,20 @@ class MultiNeuralNetwork():
             self.RAPstdsFixed = copy.copy(self.RAPstds)
             self.RAPstdsFixed[self.RAPconstant] = 1
 
+        if self.IMmeans is None and self.n_im_inputs is not None:
+            # check if IM is used as input to the model
+            self.IMmeans = im.mean(axis=0)
+            self.IMstds = im.std(axis=0)
+            self.IMconstant = self.IMstds == 0
+            self.IMstdsFixed = copy.copy(self.IMstds)
+            self.IMstdsFixed[self.IMconstant] = 1
+            
         if self.RAOBmeans is None:
             self.RAOBmeans = raob.mean(axis=0)
             self.RAOBstds = raob.std(axis=0)
             self.RAOBconstant = self.RAOBstds == 0
             self.RAOBstdsFixed = copy.copy(self.RAOBstds)
             self.RAOBstdsFixed[self.RAOBconstant] = 1
-
-    def _standardizeIM(self, im):
-        result = (im - self.IMmeans) / self.IMstdsFixed
-        result[:, self.IMconstant] = 0.0
-        return result
-
-    def _unstandardizeIM(self, im):
-        return self.IMstds * im + self.IMmeans
 
     def _standardizeRAP(self, rap):
         result = (rap - self.RAPmeans) / self.RAPstdsFixed
@@ -696,6 +705,16 @@ class MultiNeuralNetwork():
     def _unstandardizeRAP(self, rap):
         return self.RAPstds * rap + self.RAPmeans
 
+    def _standardizeIM(self, im): 
+        # only used if IM is used as input to the model
+        result = (im - self.IMmeans) / self.IMstdsFixed
+        result[:, self.IMconstant] = 0.0
+        return result
+
+    def _unstandardizeIM(self, im):
+        # only used if IM is used as input to the model
+        return self.IMstds * im + self.IMmeans
+    
     def _standardizeRAOB(self, raob):
         result = (raob - self.RAOBmeans) / self.RAOBstdsFixed
         result[:, self.RAOBconstant] = 0.0
@@ -704,24 +723,31 @@ class MultiNeuralNetwork():
     def _unstandardizeRAOB(self, raob):
         return self.RAOBstds * raob + self.RAOBmeans
 
-    def train(self, im, rap, raob, n_epochs, batch_size, method='sgd',
-              verbose=False, learning_rate=0.001, validation=None, loss_f=None):
+    def train(self, rap, im, raob, n_epochs, batch_size, method='sgd',
+              verbose=False, learning_rate=0.001, validation=None, loss_f='MSE'):
         """Use Keras Functional API to train model"""
 
+        assert ((len(validation) == 3)), f'Validation must be (rap im, raob) dimensions, {len(validation)}'
+        
         self._set_seed()
-        self._setup_standardize(im, rap, raob)
-
-        im = self._standardizeIM(im)
+        self._setup_standardize(rap, im, raob)
+        
         rap  = self._standardizeRAP(rap)
+        if self.n_im_inputs is not None:
+            im = self._standardizeIM(im)
         raob = self._standardizeRAOB(raob)
 
-        if validation is not None:
+        if validation:
             try:
-                validation = ({'im': self._standardizeIM(validation[0]), 'rap': self._standardizeRAP(validation[1])},
-                              self._standardizeRAOB(validation[2]))
+                if self.n_im_inputs is not None:
+                    inputs = {'rap': self._standardizeRAP(validation[0]), 
+                              'im': self._standardizeIM(validation[1])}
+                else:
+                    inputs = {'rap': self._standardizeRAP(validation[0])}
+                validation = (inputs, self._standardizeRAOB(validation[2]))
             except:
                 raise TypeError(
-                    f'validation must be of the following shape: (im, rap, raob)')
+                    f'validation must be of the following shape: (rap, im, raob)')
 
         try:
             if method == 'sgd':
@@ -732,32 +758,42 @@ class MultiNeuralNetwork():
             raise Exception(
                 "train: method={method} not one of 'scg' or 'adam'")
 
-        loss = tf.keras.losses.MSE if loss_f == None else loss_f
+        if loss_f == 'MSE': # default
+            loss = tf.keras.losses.MSE
+        elif loss_f == 'MAE':
+            loss = tf.keras.losses.MAE
+        else: # custom loss function
+            loss = loss_f
+            
         self.model.compile(optimizer=algo, loss=loss,
                            metrics=[tf.keras.metrics.RootMeanSquaredError(),
-                                    metrics.unstd_rmse(self._unstandardizeRAOB)])
+                                    tf.keras.metrics.MeanSquaredError(),
+                                    tf.keras.metrics.MeanAbsoluteError()])
 
-        callback = [tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=1e-5, patience=10)] if validation is not None else []
+        callback = [] 
+        # [tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=1e-1, patience=10)] if validation is not None else []
         if verbose:
             callback.append(callbacks.TrainLogger(n_epochs, step=n_epochs//5))
 
         start_time = time.time()
-        self.history = self.model.fit({'im': im, 'rap': rap}, {'out': raob},
-                                      batch_size=batch_size, epochs=n_epochs, verbose=0,
-                                      callbacks=callback, validation_data=validation).history
+        inputs = {'rap': rap, 'im': im} if self.n_im_inputs is not None else {'rap': rap}
+        self.history = self.model.fit(inputs, {'out': raob}, batch_size=batch_size, epochs=n_epochs, 
+                                      verbose=0, callbacks=callback, validation_data=validation).history
         self.training_time = time.time() - start_time
         return self
 
     def use(self, X):
         """
         Inputs:
-            X : {'im': im, 'rap': rap}
+            X : {'rap': rap, 'im': im}
         """
         # Set to error logging after model is trained
         tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
-        im  = self._standardizeIM(X['im'])
         rap = self._standardizeRAP(X['rap'])
-        Y = self._unstandardizeRAOB(self.model.predict({'im': im, 'rap': rap}))
+        if self.n_im_inputs is not None:
+            im = self._standardizeIM(X['im'])
+        inputs = {'rap': rap, 'im': im} if self.n_im_inputs is not None else {'rap': rap}
+        Y = self._unstandardizeRAOB(self.model.predict(inputs))
         return Y
 
     def save(self, path):

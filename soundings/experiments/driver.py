@@ -10,7 +10,9 @@ import os
 from soundings.preprocessing import dataloader as dl
 from soundings.deep_learning import mlutilities as ml
 from soundings.deep_learning import tf_neuralnetwork as nn
-from soundings.experiments import experiment_interface as ei
+
+from soundings.experiments.neuralnetwork_driver import NeuralNetworkDriver
+from soundings.experiments.multi_convolutional_neuralnetwork_driver import MultiConvolutionalNeuralNetwork
 
 def save_results(config: dict, results, driver):
     results.to_csv(config['results_file'], index=False)
@@ -19,9 +21,9 @@ def save_results(config: dict, results, driver):
           
 def experiment(config: dict, network_name: str, data: tuple):
     if network_name in ['NeuralNetwork']:
-        driver = ei.NeuralNetworkDriver()
-    elif network_name in ['Convolutional']:
-        pass
+        driver = NeuralNetworkDriver()
+    elif network_name in ['MultiConvolutionalNeuralNetwork']:
+        driver = MultiConvolutionalNeuralNetwork()
     else:
         raise ValueError(f'{network_name} not a valid type.')
     
@@ -82,7 +84,7 @@ def main(config_path: str):
     
 if __name__ == "__main__":
     """
-    Usage: python -u -m soundings.experiments.driver -c ./soundings/experiments/__config__.yaml
+    Usage: python -u -m soundings.experiments.driver -c ./soundings/experiments/configs/__config__.yaml
     """
     parser = argparse.ArgumentParser(description='experimental configuration')
     parser.add_argument('-c', '--config', metavar='path', type=str,
