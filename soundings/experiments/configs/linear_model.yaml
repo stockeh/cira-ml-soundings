@@ -1,18 +1,18 @@
-results_file: /mnt/data1/stock/mlsoundings/results/linear_model_temperature_dewpoint.csv
+results_file: /mnt/data1/stock/mlsoundings/results/alley_linear_model_temperature_dewpoint.csv
 model:
     network: NeuralNetwork
     n_hiddens_list:
         - [0]
-    optimizers: [adam, Adadelta]
-    learning_rates: [0.0001, 0.001, 0.01]
+    optimizers: [adam, sgd]
+    learning_rates: [0.0001, 0.001]
     activations: [None]
     losses: [MSE, MAE]
-    epochs: [10, 25, 50]
-    batch_sizes: [32, 64, 128]
+    epochs: [10, 25, 50, 100]
+    batch_sizes: [64, 128, 256]
     dropout: [False]
     batchnorm: [False]
 data:
-    saved_f: /mnt/data1/stock/mlsoundings/preprocessed.npz
+    saved_f: /mnt/data1/stock/mlsoundings/preprocessed_alley.npz
     rap:
         input_dims: 
             - [0, 1, 2, 3] # pressure, temperature, dewpoint, altitude

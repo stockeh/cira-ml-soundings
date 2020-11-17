@@ -96,12 +96,13 @@ class NeuralNetworkDriver(ExperimentInterface):
                   lr, activ, loss, n_epochs, batch_size, dropout, batchnorm)
             
                 nnet = nn.NeuralNetwork(n_network_inputs, hiddens, n_network_outputs, activation=activ,
-                                        batchnorm=batchnorm, dropout=dropout)
-
+                                        dropout=dropout, batchnorm=batchnorm)
+                nnet.model.summary()
+                
                 nnet.train(Xt, Tt, n_epochs, batch_size, method=optim, verbose=False,
                            learning_rate=lr, validation=(Xv, Tv), loss_f=loss)
                 
-                print(f'INFO: finished training model. Benchmarking now.')
+                print(f'INFO: finished training model in {nnet.training_time:.3f} seconds. Benchmarking now.')
                 
                 r = {'rap_input_dims': rap_input_dims, 'rap_output_dims': rap_output_dims,
                      'rtma_input_channels': rtma_input_channels, 'goes_input_channels': goes_input_channels,

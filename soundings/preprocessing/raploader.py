@@ -106,7 +106,7 @@ class RAPLoader(object):
             values = subprocess.check_output(command, stderr=subprocess.DEVNULL).decode('utf-8').split('\n')[:-1]
         except Exception as e:
             raise e
-
+        
         pres = np.zeros((len(locations), 51))
         temp = np.zeros((len(locations), 51))
         spec = np.zeros((len(locations), 51))

@@ -1,3 +1,4 @@
+import tensorflow as tf
 import numpy as np
 import pandas as pd
 import argparse
@@ -86,6 +87,12 @@ if __name__ == "__main__":
     """
     Usage: python -u -m soundings.experiments.driver -c ./soundings/experiments/configs/__config__.yaml
     """
+
+    gpus = tf.config.get_visible_devices('GPU')
+    for device in gpus:
+        print(device)
+        tf.config.experimental.set_memory_growth(device, True)
+
     parser = argparse.ArgumentParser(description='experimental configuration')
     parser.add_argument('-c', '--config', metavar='path', type=str,
                         required=True, help='the path to config file')

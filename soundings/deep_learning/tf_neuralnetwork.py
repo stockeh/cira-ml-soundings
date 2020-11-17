@@ -49,7 +49,7 @@ class NeuralNetwork():
                     Z = tf.keras.layers.BatchNormalization()(Z)
                 Z = tf.keras.layers.Activation(activation)(Z)
                 if dropout:
-                    Z = tf.keras.layers.Dropout(0.2)(Z)
+                    Z = tf.keras.layers.Dropout(0.20)(Z)
         Y = tf.keras.layers.Dense(n_outputs)(Z)
         self.model = tf.keras.Model(inputs=X, outputs=Y)
 
@@ -643,10 +643,11 @@ class MultiConvolutionalNeuralNetwork():
         if not (n_hiddens_list == [] or n_hiddens_list == [0]):
             for units in n_hiddens_list:
                 if dropout:
-                    Z = tf.keras.layers.Dropout(0.2)(Z) 
-                Z = tf.keras.layers.Dense(units, activation=dense_activation,
-                                          kernel_regularizer=tf.keras.regularizers.l2(0.00001))(Z) 
+                    Z = tf.keras.layers.Dropout(0.35)(Z) 
+                Z = tf.keras.layers.Dense(units, activation=dense_activation)(Z) 
                 # kernel_regularizer=tf.keras.regularizers.l2(0.0001)
+        if dropout:
+            Z = tf.keras.layers.Dropout(0.35)(Z) 
         Y = tf.keras.layers.Dense(n_outputs, name='out')(Z)
         self.model = tf.keras.Model(inputs=inputs, outputs=Y)            
 

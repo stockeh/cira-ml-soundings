@@ -1,24 +1,21 @@
-results_file: /mnt/data1/stock/mlsoundings/results/fully_connected_model_temperature_dewpoint_2.csv
+results_file: /mnt/data1/stock/mlsoundings/results/alley_fully_connected_model_temperature_dewpoint.csv
 model:
     network: NeuralNetwork
     n_hiddens_list:
         - [32]
         - [32, 32]
         - [32, 32, 32]
-        - [128]
-        - [128]
-        - [128, 128, 128]
-        - [256]
-        - [256, 256]
-        - [256, 256, 256]
-    optimizers: [adam, Adadelta]
-    learning_rates: [0.0001, 0.001]
+        - [64]
+        - [64, 64]
+        - [64, 64, 64]
+    optimizers: [adam]
+    learning_rates: [0.0001]
     activations: [tanh, relu]
     losses: [MSE, MAE]
-    epochs: [50]
+    epochs: [100]
     batch_sizes: [128]
-    dropout: [True]
-    batchnorm: [True]
+    dropout: [False, True]
+    batchnorm: [False]
 data:
     saved_f: /mnt/data1/stock/mlsoundings/preprocessed.npz
     rap:

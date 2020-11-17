@@ -113,17 +113,17 @@ def interpolate_to_height_intervals(alt, y, altitude_intervals):
 
 def nwp_querry_sgp(time, locations, dataset):
     nwp_file, pres, temp, spec, height, \
-                    lons, lats, dataset = extract_nwp_values(time, locations)
+                lons, lats = extract_nwp_values(time, locations)
     set_nwp_profile(nwp_file, pres[0], temp[0], spec[0], height[0],
                     lons[0], lats[0], dataset)
     
 def extract_nwp_values(time, locations):
     try:
         rap_timestep = raploader.RAPLoader(config['nwp']['path'], time, 
-                                              time_range_minutes=config['nwp']['time_range_minutes'])
+                                           time_range_minutes=config['nwp']['time_range_minutes'])
     except FileNotFoundError as fnfe:
         raise fnfe
-        
+
     pres, temp, spec, height, \
           lons, lats = rap_timestep.extract_rap_profile(locations, config['nwp']['wgrib2'])
     return rap_timestep.rap_file, pres, temp, spec, height, lons, lats
@@ -265,8 +265,8 @@ def set_sgp_profile(sonde, path, dataset):
             break
 
     altitude_intervals = np.linspace(
-        alt[start_indx:], alt[start_indx:] + config['top_window_boundary'], config['raob']['profile_dims'])
-
+        alt[start_indx], alt[start_indx] + config['top_window_boundary'], config['raob']['profile_dims'])
+    
     dataset.sonde_pres = interpolate_to_height_intervals(
         alt[start_indx:], p[start_indx:], altitude_intervals)
     dataset.sonde_tdry = interpolate_to_height_intervals(
@@ -274,7 +274,7 @@ def set_sgp_profile(sonde, path, dataset):
     dataset.sonde_dp = interpolate_to_height_intervals(
         alt[start_indx:], td[start_indx:], altitude_intervals)
     dataset.sonde_alt = altitude_intervals
-
+    
     dataset.sonde_file = path
     dataset.sonde_site_id = sonde.site_id
     
@@ -332,7 +332,7 @@ def extract_sgp_information():
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
             path = fp.readline().rstrip('\n')
             while path:
-                if config['date_regex'] not in path:
+                if str(config['date_regex']) not in path:
                     path = fp.readline().rstrip('\n')
                     continue
         
@@ -349,14 +349,13 @@ def extract_sgp_information():
                     continue
 
                 futures = []
-
                 futures.append(pool.submit(set_sgp_profile, sonde, path, dataset))
                 futures.append(pool.submit(set_goes_data, dataset.sonde_time, dataset.sonde_lon,
                                            dataset.sonde_lat, dataset))
                 futures.append(pool.submit(set_rtma_data, dataset.sonde_time, dataset.sonde_lon,
                                            dataset.sonde_lat, dataset))
                 futures.append(pool.submit(nwp_querry_sgp, dataset.sonde_time, 
-                                           (dataset.sonde_lon, dataset.sonde_lat), dataset))
+                                           [(dataset.sonde_lon, dataset.sonde_lat)], dataset))
                 try:
                     for future in concurrent.futures.as_completed(futures, timeout=20):
                         try:

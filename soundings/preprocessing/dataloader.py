@@ -6,6 +6,8 @@ import xarray as xr
 import time
 # pylint: disable=no-name-in-module
 
+from tqdm import tqdm
+
 from netCDF4 import Dataset
 from glob import glob
 from os.path import join, basename
@@ -390,7 +392,7 @@ def load_preprocessed_samples(vol, sgp=True, noaa=True, preprocesses_rap=False, 
     rtma = []
     
     s = time.time()
-    for i, f in enumerate(files):
+    for i, f in tqdm(enumerate(files)):
         xar = xr.open_dataset(f)
         raob_profile = np.concatenate((xar.sonde_pres.values.reshape(-1,1),
                                        xar.sonde_tdry.values.reshape(-1,1),
@@ -445,10 +447,11 @@ def load_preprocessed_samples(vol, sgp=True, noaa=True, preprocesses_rap=False, 
         goes.append(xar.goes_abi.values)
         rtma.append(xar.rtma_values.values)
         sonde_files.append(f"{str(xar.sonde_site_id.values)}_{str(xar.sonde_rel_time.values)}_" \
-                           f"{str(xar.sonde_file.values).split('/')[-1][:-4]}")
+                           f"{str(xar.sonde_file.values).split('/')[-1][:-4]}_" \
+                           f"{str(xar.sonde_lon.values)}_{str(xar.sonde_lat.values)}")
         xar.close()
         fp.value += 1
-
+        
     e = time.time() - s
     print(f'time: {e:.3f}, avg: {e/len(files):.3f} seconds')
     
