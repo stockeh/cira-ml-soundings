@@ -2,7 +2,7 @@ results_file: /mnt/data1/stock/mlsoundings/results/alley_skip_model_temperature_
 model:
     network: SkipNeuralNetwork
     n_hiddens_list:
-        - [256]
+#         - [256]
         - []
     n_units_in_conv_layers:
         - [4, 8, 16, 32, 64]
@@ -27,9 +27,9 @@ data:
     rtma:
         input_channels:
             - []
-            - [0, 1, 2] # lpi, ...
+#             - [0, 1, 2] # lpi, ...
     goes:
         input_channels:
             - []
-            - [0, 1, 2, 3, 4, 5, 6, 7]
+#             - [0, 1, 2, 3, 4, 5, 6, 7]
 

@@ -10,7 +10,7 @@ from soundings.experiments import results as results_calc
 from soundings.deep_learning import tf_neuralnetwork as nn
 
 
-class MultiConvolutionalNeuralNetwork(ExperimentInterface):
+class CNNSkipNetworkDriver(ExperimentInterface):
     
     def get_experiemnts(self, config: dict) -> (list, list):
         # network config
@@ -115,7 +115,7 @@ class MultiConvolutionalNeuralNetwork(ExperimentInterface):
                 elif config['model']['network'] == 'SkipNeuralNetwork':
                     network = nn.SkipNeuralNetwork
                 else:
-                    raise ValueException(f'invalid network spec, {config['model']['network']}')
+                    raise ValueException(f"invalid network spec, {config['model']['network']}")
                 nnet = network(n_rap_inputs, n_im_inputs, n_hiddens_list, n_units_in_conv_layers,
                                                           [literal_eval(kernels_size_and_stride)]* \
                                                               len(n_units_in_conv_layers), # all same size

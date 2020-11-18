@@ -45,10 +45,10 @@ def load_data(config: dict, network_name: str) -> tuple:
     
     print(f'INFO: total data shape -- {raob.shape}, {rap.shape}, {goes.shape}, {rtma.shape}')
 
-    train_i, val_i, test_i = ml.standard_partition_indicies(rap, percentages=(0.75,0.10,0.15),
+    train_i, val_i, test_i = ml.standard_partition_indicies(sonde_files, percentages=(0.75,0.10,0.15),
                                                             shuffle=True, seed=1234)
 
-    RAPtrain,  RAPval , RAPtest  = rap[train_i], rap[val_i], rap[test_i]
+    RAPtrain,  RAPval,  RAPtest  = rap[train_i], rap[val_i], rap[test_i]
     RTMAtrain, RTMAval, RTMAtest = rtma[train_i], rtma[val_i], rtma[test_i]
     GOEStrain, GOESval, GOEStest = goes[train_i], goes[val_i], goes[test_i]
     RAOBtrain, RAOBval, RAOBtest = raob[train_i], raob[val_i], raob[test_i]

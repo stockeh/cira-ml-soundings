@@ -339,7 +339,7 @@ class SkipNeuralNetwork():
         self.n_outputs = n_outputs
         
         # encoder
-        X1 = Z1 = tf.keras.Input(shape=n_rap_inputs)
+        X1 = Z1 = tf.keras.Input(shape=n_rap_inputs, name='rap')
 
         for i, ((kernel, stride), units) in enumerate(zip(kernels_size_and_stride[:-1],
                                                           n_units_in_conv_layers[:-1])):
@@ -380,7 +380,7 @@ class SkipNeuralNetwork():
         
         # final conv layer (linear; no activation)
         Z1 = tf.keras.layers.Conv1D(
-                self.n_outputs[1], kernel_size=kernels_size_and_stride[0][0], 
+                n_outputs / n_rap_inputs[0], kernel_size=kernels_size_and_stride[0][0], 
                 strides=kernels_size_and_stride[0][1], padding='same')(Z1)
 
         # add only the temperature profile back to Z.
@@ -396,7 +396,7 @@ class SkipNeuralNetwork():
         else:
             Z = Z1
             inputs = X1
-                
+        
         # Dense Layers 
         if not (n_hiddens_list == [] or n_hiddens_list == [0]):
             for units in n_hiddens_list:
@@ -409,7 +409,7 @@ class SkipNeuralNetwork():
             
         # Output Layer
         if self.n_im_inputs is not None:
-            Y = tf.keras.layers.Dense(np.prod(n_outputs), name='out')(Z)
+            Y = tf.keras.layers.Dense(n_outputs, name='out')(Z)
         else:
             Y = Z
             
@@ -542,7 +542,7 @@ class SkipNeuralNetwork():
 
         start_time = time.time()
         inputs = {'rap': rap, 'im': im} if self.n_im_inputs is not None else {'rap': rap}
-        self.history = self.model.fit(inputs, {'out': raob}, batch_size=batch_size, epochs=n_epochs, 
+        self.history = self.model.fit(inputs, raob, batch_size=batch_size, epochs=n_epochs, 
                                       verbose=0, callbacks=callback, validation_data=validation).history
         self.training_time = time.time() - start_time
         return self
