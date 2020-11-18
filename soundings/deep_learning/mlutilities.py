@@ -26,6 +26,70 @@ def rmse(A, B):
 
 ######################################################################
 
+
+def standard_partition_indicies(files, percentages=(0.75,0.10,0.15),
+                                shuffle=False, seed=1234):
+    """Partition data to have an equal proportion of locations per data set.
+    ---
+    params:
+        percentages : list
+            (train, validation, test)
+    """
+    validateFraction = 0
+    if isinstance(percentages, (tuple, list)):
+        trainFraction = percentages[0]
+        testFraction = percentages[-1]
+        if len(percentages) == 3:
+            validateFraction = percentages[1]
+
+    elif isinstance(percentages, float):
+        trainFraction = percentages
+        testFraction = 1 - trainFraction
+
+    else:
+        raise TypeError(
+            f'percentages {percentages} must be of the following (train, val, test) or 0.8 for train')
+    
+    if shuffle:
+        np.random.seed(seed)
+
+    locs = np.array([f.split('_')[0] for f in files]).reshape(-1,1)
+    classes = np.unique(locs)
+
+    train_i = []
+    val_i   = []
+    test_i  = []
+
+    for c in classes:
+        # all indicies for class c
+        c_i = np.where(locs == c)[0]
+        if shuffle: # shuffle c indicies
+            np.random.shuffle(c_i)
+
+        # partitioned indicies for class c
+        n = len(c_i)
+        nTrain    = round(trainFraction * n)
+        nValidate = round(validateFraction * n)
+        nTest     = round(testFraction * n)
+        if nTrain + nValidate + nTest > n:
+            nTest = n - nTrain - nValidate
+
+        train_i += c_i[:nTrain].tolist()
+        if nValidate > 0:
+            val_i += c_i[nTrain:nTrain+nValidate].tolist()
+        test_i += c_i[nTrain+nValidate:nTrain+nValidate+nTest].tolist()
+
+    if shuffle: # shuffle all indicies
+        np.random.shuffle(train_i)
+        np.random.shuffle(val_i)
+        np.random.shuffle(test_i)
+
+    if validateFraction > 0:
+        return train_i, val_i, test_i
+    else:
+        return train_i, test_i
+
+
 def parition_all(rap=None, raob=None, goes=None, rtma=None, 
                  percentages=(0.75,0.10,0.15), shuffle=False, seed=1234):
     """
@@ -34,6 +98,8 @@ def parition_all(rap=None, raob=None, goes=None, rtma=None,
         percentages : list
             (train, validation, test)
     """
+    
+    print('DEPRECATED! Use ml.standard_partition_indicies')
     
     validateFraction = 0
     if isinstance(percentages, (tuple, list)):
@@ -331,3 +397,4 @@ def draw(Vs, W, inputNames=None, outputNames=None, gray=False):
                 ax.text(x0+0.2, y, n, fontsize=20)
     ax.axis([0, xlim, ylim, 0])
     ax.axis('off')
+

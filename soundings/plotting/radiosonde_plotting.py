@@ -435,7 +435,7 @@ def plot_monthly_error(monthly_err, months, title_string=None, option_dict=None,
     if title_string:
         ax.set_title(title_string)
     
-    ax.set_ylabel('RMSE');
+    ax.set_ylabel('Vertical RMSE');
     
     # TODO: varaible months index into list 
     pyplot.setp(ax, xticks=numpy.unique(months),

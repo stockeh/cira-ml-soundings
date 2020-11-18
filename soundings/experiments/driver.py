@@ -13,7 +13,7 @@ from soundings.deep_learning import mlutilities as ml
 from soundings.deep_learning import tf_neuralnetwork as nn
 
 from soundings.experiments.neuralnetwork_driver import NeuralNetworkDriver
-from soundings.experiments.multi_convolutional_neuralnetwork_driver import MultiConvolutionalNeuralNetwork
+from soundings.experiments.cnn_skip_neuralnetwork_driver import CNNSkipNetworkDriver
 
 def save_results(config: dict, results, driver):
     results.to_csv(config['results_file'], index=False)
@@ -23,8 +23,8 @@ def save_results(config: dict, results, driver):
 def experiment(config: dict, network_name: str, data: tuple):
     if network_name in ['NeuralNetwork']:
         driver = NeuralNetworkDriver()
-    elif network_name in ['MultiConvolutionalNeuralNetwork']:
-        driver = MultiConvolutionalNeuralNetwork()
+    elif network_name in ['MultiConvolutionalNeuralNetwork', 'SkipNeuralNetwork']:
+        driver = CNNSkipNetworkDriver()
     else:
         raise ValueError(f'{network_name} not a valid type.')
     
@@ -44,12 +44,14 @@ def load_data(config: dict, network_name: str) -> tuple:
     sonde_files = container['sonde_files'] # is this needed now?
     
     print(f'INFO: total data shape -- {raob.shape}, {rap.shape}, {goes.shape}, {rtma.shape}')
-    
-    (RAPtrain, RAPval, RAPtest,
-     RTMAtrain, RTMAval, RTMAtest,
-     GOEStrain, GOESval, GOEStest,
-     RAOBtrain, RAOBval, RAOBtest) = ml.parition_all(rap=rap, raob=raob, goes=goes, rtma=rtma, 
-                                                     percentages=(0.75,0.15,0.10), shuffle=False, seed=1234)
+
+    train_i, val_i, test_i = ml.standard_partition_indicies(rap, percentages=(0.75,0.10,0.15),
+                                                            shuffle=True, seed=1234)
+
+    RAPtrain,  RAPval , RAPtest  = rap[train_i], rap[val_i], rap[test_i]
+    RTMAtrain, RTMAval, RTMAtest = rtma[train_i], rtma[val_i], rtma[test_i]
+    GOEStrain, GOESval, GOEStest = goes[train_i], goes[val_i], goes[test_i]
+    RAOBtrain, RAOBval, RAOBtest = raob[train_i], raob[val_i], raob[test_i]
     
     print(f'INFO: partitioned data shape -- train: {RAPtrain.shape[0]}, val: {RAPval.shape[0]}, test: {RAPtest.shape[0]}')
     return (RAPtrain, RAPval, RAPtest, RTMAtrain, RTMAval, RTMAtest,

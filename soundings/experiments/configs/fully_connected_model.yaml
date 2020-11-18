@@ -17,7 +17,7 @@ model:
     dropout: [False, True]
     batchnorm: [False]
 data:
-    saved_f: /mnt/data1/stock/mlsoundings/preprocessed.npz
+    saved_f: /mnt/data1/stock/mlsoundings/preprocessed_alley.npz
     rap:
         input_dims: 
             - [0, 1, 2, 3] # pressure, temperature, dewpoint, altitude

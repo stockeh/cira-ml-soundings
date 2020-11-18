@@ -1,15 +1,14 @@
-results_file: /mnt/data1/stock/mlsoundings/results/multi_cnn_model_temperature_dewpoint_regularization.csv
+results_file: /mnt/data1/stock/mlsoundings/results/alley_multi_cnn_model_temperature_dewpoint.csv
 model:
     network: MultiConvolutionalNeuralNetwork
     n_hiddens_list:
-        - [2048, 1024]
-        - [1024, 512]
         - [512, 256]
+        - [256]
         - []
     n_units_in_conv_layers:
-        - [32, 64, 128, 128, 128, 128]
-        - [64, 128, 256, 512]
-        - [64, 128, 256, 512, 512]
+        - [4, 8, 16, 32, 64]
+        - [16, 32, 64, 128, 128]
+        - [32, 64, 128, 256, 256]
     kernels_size_and_strides:
         - (3, 1)
     optimizers: [adam]
@@ -22,7 +21,7 @@ model:
     dropout: [False, True]
     batchnorm: [False]
 data:
-    saved_f: /mnt/data1/stock/mlsoundings/preprocessed.npz
+    saved_f: /mnt/data1/stock/mlsoundings/preprocessed_alley.npz
     rap:
         input_dims: 
             - [0, 1, 2, 3] # pressure, temperature, dewpoint, altitude

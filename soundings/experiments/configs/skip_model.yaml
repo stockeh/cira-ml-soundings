@@ -1,0 +1,35 @@
+results_file: /mnt/data1/stock/mlsoundings/results/alley_skip_model_temperature_dewpoint.csv
+model:
+    network: SkipNeuralNetwork
+    n_hiddens_list:
+        - [256]
+        - []
+    n_units_in_conv_layers:
+        - [4, 8, 16, 32, 64]
+    kernels_size_and_strides:
+        - (3, 1)
+    optimizers: [adam]
+    learning_rates: [0.0001]
+    rap_activations: [relu]
+    dense_activations: [relu]
+    losses: [MAE]
+    epochs: [100]
+    batch_sizes: [128]
+    dropout: [False]
+    batchnorm: [False]
+data:
+    saved_f: /mnt/data1/stock/mlsoundings/preprocessed_alley.npz
+    rap:
+        input_dims: 
+            - [0, 1, 2, 3] # pressure, temperature, dewpoint, altitude
+        output_dims: 
+            - [1, 2] # temperature, dewpoint
+    rtma:
+        input_channels:
+            - []
+            - [0, 1, 2] # lpi, ...
+    goes:
+        input_channels:
+            - []
+            - [0, 1, 2, 3, 4, 5, 6, 7]
+
