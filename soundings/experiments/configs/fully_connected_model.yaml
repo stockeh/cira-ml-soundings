@@ -4,10 +4,9 @@ model:
     n_hiddens_list:
         - [32]
         - [32, 32]
-        - [32, 32, 32]
         - [64]
         - [64, 64]
-        - [64, 64, 64]
+        - [256]
     optimizers: [adam]
     learning_rates: [0.0001]
     activations: [tanh, relu]

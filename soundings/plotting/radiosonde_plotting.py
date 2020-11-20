@@ -54,12 +54,14 @@ DEFAULT_OPTION_DICT = {
 
 
 def _init_save_img(option_dict):    
-    option_dict[DEFAULT_FONT_SIZE] = 30
-    option_dict[TITLE_FONT_SIZE] = 25
-    option_dict[FIGURE_WIDTH_KEY] = 15
-    option_dict[FIGURE_HEIGHT_KEY] = 15
+    option_dict[DEFAULT_FONT_SIZE] = 16
+    option_dict[TITLE_FONT_SIZE] = 18
+    option_dict[FIGURE_WIDTH_KEY] = 10
+    option_dict[FIGURE_HEIGHT_KEY] = 10
     option_dict[MAIN_LINE_WIDTH_KEY] = 5
-
+    option_dict[GRID_LINE_WIDTH_KEY] = 2
+    option_dict[CONTOUR_LINE_WIDTH_KEY] = 2
+    
 def colour_from_numpy_to_tuple(input_colour):
     """Converts colour from numpy array to tuple (if necessary).
     :param input_colour: Colour (possibly length-3 or length-4 numpy array).
@@ -85,20 +87,20 @@ def _plot_attributes(skewt_object, option_dict, title_string):
 
     axes_object.grid(
         color=colour_from_numpy_to_tuple(grid_line_colour),
-        linewidth=grid_line_width, linestyle='dashed'
+        linewidth=grid_line_width, linestyle='dashed',
     )
 
     skewt_object.plot_dry_adiabats(
         color=colour_from_numpy_to_tuple(dry_adiabat_colour),
-        linewidth=contour_line_width, linestyle='solid', alpha=1.
+        linewidth=contour_line_width, linestyle='solid', alpha=.7
     )
     skewt_object.plot_moist_adiabats(
         color=colour_from_numpy_to_tuple(moist_adiabat_colour),
-        linewidth=contour_line_width, linestyle='solid', alpha=1.
+        linewidth=contour_line_width, linestyle='solid', alpha=.7
     )
     skewt_object.plot_mixing_lines(
         color=colour_from_numpy_to_tuple(isohume_colour),
-        linewidth=contour_line_width, linestyle='solid', alpha=1.
+        linewidth=contour_line_width, linestyle='solid', alpha=.7
     )
 
     axes_object.set_ylim(1000, 100)
