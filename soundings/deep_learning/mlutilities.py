@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as pltpatch  # for Arc
 import matplotlib.collections as pltcoll
 
+import pandas as pd
 import numpy as np
 
 ######################################################################
@@ -53,8 +54,11 @@ def standard_partition_indicies(files, percentages=(0.75,0.10,0.15),
     if shuffle:
         np.random.seed(seed)
 
-    locs = np.array([f.split('_')[0] for f in files]).reshape(-1,1)
+    content = np.array([f.split('_') for f in files])
+    locs    = content[:,0:1]
+    mons    = pd.to_datetime(content[:,1], format='%Y-%m-%dT%H:%M:%S.%f').month.values.reshape(-1,1)
     classes = np.unique(locs)
+    months  = np.unique(mons)
 
     train_i = []
     val_i   = []
@@ -63,21 +67,27 @@ def standard_partition_indicies(files, percentages=(0.75,0.10,0.15),
     for c in classes:
         # all indicies for class c
         c_i = np.where(locs == c)[0]
-        if shuffle: # shuffle c indicies
-            np.random.shuffle(c_i)
+        for m in months:
+            # all indicies for month m
+            m_i  = np.where(mons == m)[0]
+            # intersection between month and location indicies
+            cm_i = np.intersect1d(c_i, m_i)
+            
+            if shuffle: # shuffle indicies
+                np.random.shuffle(cm_i)
+            
+            # partitioned indicies for class c
+            n = len(cm_i)
+            nTrain    = round(trainFraction * n)
+            nValidate = round(validateFraction * n)
+            nTest     = round(testFraction * n)
+            if nTrain + nValidate + nTest > n:
+                nTest = n - nTrain - nValidate
 
-        # partitioned indicies for class c
-        n = len(c_i)
-        nTrain    = round(trainFraction * n)
-        nValidate = round(validateFraction * n)
-        nTest     = round(testFraction * n)
-        if nTrain + nValidate + nTest > n:
-            nTest = n - nTrain - nValidate
-
-        train_i += c_i[:nTrain].tolist()
-        if nValidate > 0:
-            val_i += c_i[nTrain:nTrain+nValidate].tolist()
-        test_i += c_i[nTrain+nValidate:nTrain+nValidate+nTest].tolist()
+            train_i += cm_i[:nTrain].tolist()
+            if nValidate > 0:
+                val_i += cm_i[nTrain:nTrain+nValidate].tolist()
+            test_i += cm_i[nTrain+nValidate:nTrain+nValidate+nTest].tolist()
 
     if shuffle: # shuffle all indicies
         np.random.shuffle(train_i)
@@ -88,7 +98,7 @@ def standard_partition_indicies(files, percentages=(0.75,0.10,0.15),
         return train_i, val_i, test_i
     else:
         return train_i, test_i
-
+    
 
 def parition_all(rap=None, raob=None, goes=None, rtma=None, 
                  percentages=(0.75,0.10,0.15), shuffle=False, seed=1234):

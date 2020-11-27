@@ -338,19 +338,26 @@ class SkipNeuralNetwork():
         self.kernels_size_and_stride = kernels_size_and_stride
         self.n_outputs = n_outputs
         
+        l2_rate = 1e-5
+        dropout_rate = 0.2
+        
         # encoder
         X1 = Z1 = tf.keras.Input(shape=n_rap_inputs, name='rap')
 
         for i, ((kernel, stride), units) in enumerate(zip(kernels_size_and_stride[:-1],
                                                           n_units_in_conv_layers[:-1])):
             Z1 = tf.keras.layers.Conv1D(units, kernel_size=kernel,
-                                       strides=stride, padding='same')(Z1)
+                                        strides=stride, padding='same',
+                                        kernel_regularizer=tf.keras.regularizers.l2(l2_rate))(Z1)
             Z1 = tf.keras.layers.Activation(rap_activation)(Z1)
             Z1 = tf.keras.layers.Conv1D(units, kernel_size=kernel,
-                           strides=stride, padding='same', name=f'skip_conv1d_{i}')(Z1)
+                                        strides=stride, padding='same', name=f'skip_conv1d_{i}',
+                                        kernel_regularizer=tf.keras.regularizers.l2(l2_rate))(Z1)
             Z1 = tf.keras.layers.Activation(rap_activation)(Z1)
             Z1 = tf.keras.layers.MaxPooling1D(pool_size=2)(Z1)
-            
+            if dropout:
+                Z1 = tf.keras.layers.Dropout(dropout_rate)(Z1)
+
         skips = list(reversed([layer for layer in tf.keras.Model(X1, Z1).layers if 'skip' in layer.name]))
     
         # bottleneck layer
@@ -358,8 +365,9 @@ class SkipNeuralNetwork():
                 n_units_in_conv_layers[-1], 
                 kernel_size=kernels_size_and_stride[-1][0], 
                 strides=kernels_size_and_stride[-1][1], 
-                padding='same')(Z1)
-        Z1 = tf.keras.layers.LeakyReLU(alpha=0.2)(Z1)
+                padding='same',
+                kernel_regularizer=tf.keras.regularizers.l2(l2_rate))(Z1)
+        Z1 = tf.keras.layers.Activation(rap_activation)(Z1)
         
         # IM Input
         if self.n_im_inputs is not None:
@@ -368,35 +376,40 @@ class SkipNeuralNetwork():
             bottleneck_shape = Z1.shape.as_list()[1:]
             Z1 = tf.keras.layers.Flatten()(Z1)
             Z1 = tf.keras.layers.Concatenate(axis=1)([Z1, Z2]) # Join IM & RAP
-            Z1 = tf.keras.layers.Dense(np.prod(bottleneck_shape))(Z1)
-            Z1 = tf.keras.layers.LeakyReLU(alpha=0.2)(Z1)
+            Z1 = tf.keras.layers.Dense(np.prod(bottleneck_shape),
+                                       kernel_regularizer=tf.keras.regularizers.l2(l2_rate))(Z1)
+            Z1 = tf.keras.layers.Activation(rap_activation)(Z1)
             Z = tf.keras.layers.Reshape(bottleneck_shape)(Z1)
             inputs = [X1, X2]
         else:
             Z = Z1
             inputs = X1
         if dropout:
-            Z = tf.keras.layers.Dropout(0.20)(Z)
+            Z = tf.keras.layers.Dropout(dropout_rate)(Z)
             
         # decoder
         for (kernel, stride), units, skip in zip(reversed(kernels_size_and_stride[:-1]),
                                                  reversed(n_units_in_conv_layers[:-1]),
                                                  skips):
             Z = tf.keras.layers.Conv1D(units, kernel_size=kernel, 
-                           strides=stride, padding='same')(Z)
+                                       strides=stride, padding='same',
+                                       kernel_regularizer=tf.keras.regularizers.l2(l2_rate))(Z)
             Z = tf.keras.layers.Activation(rap_activation)(Z)
             Z = tf.keras.layers.UpSampling1D(size=2)(Z)
-            Z = tf.keras.layers.Add()([Z, skip.output]) # try Concatenate(axis=2)
+            # Z = tf.keras.layers.Concatenate(axis=2)([Z, skip.output])
+            Z = tf.keras.layers.Add()([Z, skip.output])
             Z = tf.keras.layers.Conv1D(units, kernel_size=kernel, 
-                                       strides=stride, padding='same')(Z)
+                                       strides=stride, padding='same',
+                                       kernel_regularizer=tf.keras.regularizers.l2(l2_rate))(Z)
             Z = tf.keras.layers.Activation(rap_activation)(Z)
             if dropout:
-                Z = tf.keras.layers.Dropout(0.50)(Z)
+                Z = tf.keras.layers.Dropout(dropout_rate)(Z)
         
         # final conv layer (linear; no activation)
         Z = tf.keras.layers.Conv1D(
                 n_outputs / n_rap_inputs[0], kernel_size=kernels_size_and_stride[0][0], 
-                strides=kernels_size_and_stride[0][1], padding='same')(Z)
+                strides=kernels_size_and_stride[0][1], padding='same',
+                kernel_regularizer=tf.keras.regularizers.l2(l2_rate))(Z)
 
         # add only the temperature profile back to Z.
         Z = tf.keras.layers.Add()([X1[:,:,1:3], Z]) # temperature & dewpoint, e.g. (256,4) + (256,2)
@@ -406,10 +419,10 @@ class SkipNeuralNetwork():
         if not (n_hiddens_list == [] or n_hiddens_list == [0]):
             for units in n_hiddens_list:
                 if dropout:
-                    Z = tf.keras.layers.Dropout(0.35)(Z) 
+                    Z = tf.keras.layers.Dropout(dropout_rate)(Z) 
                 Z = tf.keras.layers.Dense(units, activation=dense_activation)(Z) 
             if dropout:
-                Z = tf.keras.layers.Dropout(0.35)(Z) 
+                Z = tf.keras.layers.Dropout(dropout_rate)(Z) 
             # Output Layer
             Y = tf.keras.layers.Dense(n_outputs, name='out')(Z)
         else:
