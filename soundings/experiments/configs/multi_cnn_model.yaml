@@ -15,7 +15,7 @@ model:
     learning_rates: [0.0001]
     rap_activations: [relu]
     dense_activations: [relu]
-    losses: [MAE]
+    losses: [MAE, MSE]
     epochs: [100]
     batch_sizes: [128]
     dropout: [False, True]

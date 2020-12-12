@@ -22,5 +22,5 @@ nwp:
   path: /mnt/mlnas01/grasso/cira
   wgrib2: /home/stock/bin/grib2/wgrib2/wgrib2
 output_path: /mnt/data1/stock/mlsoundings/processed
-date_regex: 201812
+date_regex: 201712
 top_window_boundary: 17000

@@ -58,6 +58,11 @@ class NeuralNetwork():
         self.Tmeans = None
         self.Tstds = None
 
+        self.Xmax = None
+        self.Xmin = None
+        self.Tmax = None
+        self.Tmin = None
+        
         self.history = None
         self.training_time = None
 
@@ -105,7 +110,30 @@ class NeuralNetwork():
 
     def _unstandardizeT(self, Ts):
         return self.Tstds * Ts + self.Tmeans
+    
+    
+#     def _setup_standardize(self, X, T):
+#         if self.Xmax is None:
+#             self.Xmax = X.max(axis=0)
+#             self.Xmin = X.min(axis=0)
+            
+#         if self.Tmax is None:
+#             self.Tmax = T.max(axis=0)
+#             self.Tmin = T.min(axis=0)
+    
+#     def _standardizeX(self, X):
+#         return (X - self.Xmin) / (self.Xmax - self.Xmin)
 
+#     def _unstandardizeX(self, Xs):
+#         return Xs * (self.Xmax - self.Xmin) + self.Xmin
+
+#     def _standardizeT(self, T):
+#         return (T - self.Tmin) / (self.Tmax - self.Tmin)
+
+#     def _unstandardizeT(self, Ts):
+#         return Ts * (self.Tmax - self.Tmin) + self.Tmin
+
+    
     def train(self, X, T, n_epochs, batch_size, method='sgd',
               verbose=False, learning_rate=0.001, validation=None, loss_f='MSE'):
         """Use Keras Functional API to train model"""
@@ -636,11 +664,11 @@ class MultiConvolutionalNeuralNetwork():
         if not (n_hiddens_list == [] or n_hiddens_list == [0]):
             for units in n_hiddens_list:
                 if dropout:
-                    Z = tf.keras.layers.Dropout(0.35)(Z) 
+                    Z = tf.keras.layers.Dropout(0.20)(Z) 
                 Z = tf.keras.layers.Dense(units, activation=dense_activation)(Z) 
                 # kernel_regularizer=tf.keras.regularizers.l2(0.0001)
         if dropout:
-            Z = tf.keras.layers.Dropout(0.35)(Z) 
+            Z = tf.keras.layers.Dropout(0.20)(Z) 
         Y = tf.keras.layers.Dense(n_outputs, name='out')(Z)
         self.model = tf.keras.Model(inputs=inputs, outputs=Y)            
 
