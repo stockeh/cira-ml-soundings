@@ -11,6 +11,31 @@ import tensorflow as tf
 from soundings.deep_learning import callbacks
 from soundings.deep_learning import tf_metrics as metrics
 
+from tensorflow.python.keras import backend as K
+from tensorflow.python.ops import math_ops
+from tensorflow.python.framework import ops
+
+def weighted_mean_squared_error(y_true, y_pred, scale, lmda):
+    """exponential decay weighted MSE"""
+    y_pred = ops.convert_to_tensor_v2(y_pred)
+    y_true = math_ops.cast(y_true, y_pred.dtype)
+    diff = math_ops.squared_difference(y_pred, y_true)
+
+    x = np.arange(diff.shape[1])
+    y = lambda x: scale * np.exp(-lmda * x) + 1
+    diff *= y(x)
+
+    return K.mean(diff, axis=-1)
+
+def seperated_mean_squared_error(y_true, y_pred):
+    y_pred = ops.convert_to_tensor_v2(y_pred)
+    y_true = math_ops.cast(y_true, y_pred.dtype)
+    seperation = int(y_true.shape[1] * 0.2)
+    diff1 = math_ops.square(math_ops.squared_difference(y_pred[:,:seperation], y_true[:,:seperation]))
+    diff2 = math_ops.squared_difference(y_pred[:,seperation:], y_true[:,seperation:])
+    diff  = tf.concat([diff1, diff2], axis=1)
+    return K.mean(diff, axis=-1)
+
 def loadnn(path):
     try:
         with open(path + '/class.pickle', 'rb') as f:
@@ -367,13 +392,13 @@ class SkipNeuralNetwork():
         self.n_outputs = n_outputs
         
         l2_rate = 1e-5
-        dropout_rate = 0.2
+        dropout_rate = 0.1
         
         # encoder
         X1 = Z1 = tf.keras.Input(shape=n_rap_inputs, name='rap')
 
-        for i, ((kernel, stride), units) in enumerate(zip(kernels_size_and_stride[:-1],
-                                                          n_units_in_conv_layers[:-1])):
+        for i, ((kernel, stride), units) in enumerate(zip(kernels_size_and_stride[:],
+                                                          n_units_in_conv_layers[:])):
             Z1 = tf.keras.layers.Conv1D(units, kernel_size=kernel,
                                         strides=stride, padding='same',
                                         kernel_regularizer=tf.keras.regularizers.l2(l2_rate))(Z1)
@@ -390,7 +415,7 @@ class SkipNeuralNetwork():
     
         # bottleneck layer
         Z1 = tf.keras.layers.Conv1D(
-                n_units_in_conv_layers[-1], 
+                1, 
                 kernel_size=kernels_size_and_stride[-1][0], 
                 strides=kernels_size_and_stride[-1][1], 
                 padding='same',
@@ -414,18 +439,18 @@ class SkipNeuralNetwork():
             inputs = X1
         if dropout:
             Z = tf.keras.layers.Dropout(dropout_rate)(Z)
-            
+    
         # decoder
-        for (kernel, stride), units, skip in zip(reversed(kernels_size_and_stride[:-1]),
-                                                 reversed(n_units_in_conv_layers[:-1]),
+        for (kernel, stride), units, skip in zip(reversed(kernels_size_and_stride[:]),
+                                                 reversed(n_units_in_conv_layers[:]),
                                                  skips):
             Z = tf.keras.layers.Conv1D(units, kernel_size=kernel, 
                                        strides=stride, padding='same',
                                        kernel_regularizer=tf.keras.regularizers.l2(l2_rate))(Z)
             Z = tf.keras.layers.Activation(rap_activation)(Z)
             Z = tf.keras.layers.UpSampling1D(size=2)(Z)
-            # Z = tf.keras.layers.Concatenate(axis=2)([Z, skip.output])
-            Z = tf.keras.layers.Add()([Z, skip.output])
+            Z = tf.keras.layers.Concatenate(axis=2)([Z, skip.output])
+            # Z = tf.keras.layers.Add()([Z, skip.output])
             Z = tf.keras.layers.Conv1D(units, kernel_size=kernel, 
                                        strides=stride, padding='same',
                                        kernel_regularizer=tf.keras.regularizers.l2(l2_rate))(Z)
@@ -565,15 +590,22 @@ class SkipNeuralNetwork():
         except:
             raise Exception(
                 "train: method={method} not one of 'scg' or 'adam'")
-
+            
         if loss_f == 'MSE': # default
             loss = tf.keras.losses.MSE
         elif loss_f == 'MAE':
             loss = tf.keras.losses.MAE
+        elif loss_f == 'Huber':
+            loss = tf.keras.losses.Huber()
+        elif loss_f == 'WMSE':
+            loss = [lambda y_true,y_pred: weighted_mean_squared_error(y_true, y_pred, scale=2, lmda=0.03)]
+        elif loss_f == 'SMSE':
+            loss = seperated_mean_squared_error
         else: # custom loss function
             loss = loss_f
             
-        self.model.compile(optimizer=algo, loss=loss,
+            
+        self.model.compile(optimizer=algo, loss=loss, # Huber #LogCosh
                            metrics=[tf.keras.metrics.RootMeanSquaredError(),
                                     tf.keras.metrics.MeanSquaredError(),
                                     tf.keras.metrics.MeanAbsoluteError()])

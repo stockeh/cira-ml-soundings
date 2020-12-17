@@ -4,17 +4,20 @@ model:
     n_hiddens_list:
         - []
     n_units_in_conv_layers:
-        - [16, 32, 64, 16]
-        - [32, 64, 128, 32]
-        - [32, 64, 128, 256, 32]
+        - [8, 16, 32, 64]
+        - [16, 32, 64, 128]
+        - [32, 64, 128, 256]
+        - [32, 32, 32]
+        - [256]
+        - [64, 128]
     kernels_size_and_strides:
         - (3, 1)
     optimizers: [adam]
     learning_rates: [0.0001]
     rap_activations: [relu]
     dense_activations: [relu]
-    losses: [MSE, MAE]
-    epochs: [200]
+    losses: [MSE, MAE, Huber]
+    epochs: [125]
     batch_sizes: [128]
     dropout: [False, True]
     batchnorm: [False]
