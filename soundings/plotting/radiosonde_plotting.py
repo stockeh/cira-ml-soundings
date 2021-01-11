@@ -189,7 +189,7 @@ def plot_sounding(sounding_dict, title_string=None, option_dict=None, file_name=
         skewt_object.plot(
             pressure, temperature,
             color=colour_from_numpy_to_tuple(option_dict[MAIN_LINE_COLOUR_KEY]),
-            linewidth=main_line_width, linestyle='solid', label='RAOB'
+            linewidth=main_line_width, linestyle='solid', label='RAOB'+ '$_T$'
         )
     except KeyError:
         pass
@@ -197,8 +197,8 @@ def plot_sounding(sounding_dict, title_string=None, option_dict=None, file_name=
         dewpoint = radiosonde_utils.convert_metpy_dewpoint(sounding_dict)
         skewt_object.plot(
             pressure, dewpoint,
-            color=colour_from_numpy_to_tuple(option_dict[MAIN_LINE_COLOUR_KEY]),
-            linewidth=main_line_width, linestyle='solid'
+            color='tab:green',
+            linewidth=main_line_width, linestyle='solid', label='RAOB'+ '$_{Td}$'
         )
     except KeyError:
         pass
@@ -214,6 +214,9 @@ def plot_sounding(sounding_dict, title_string=None, option_dict=None, file_name=
 
     _plot_attributes(skewt_object, option_dict, title_string)
 
+    skewt_object.ax.set_xlabel('Temperature [C]')
+    skewt_object.ax.set_ylabel('Pressure [mb]')
+    
     if file_name:
         pyplot.savefig(file_name, dpi=option_dict[DOTS_PER_INCH])
         pyplot.show()
@@ -314,7 +317,7 @@ def plot_nwp_ml_sounding(sounding_dict, title_string=None, option_dict=None, fil
     
     nwp_line_colour = option_dict[NWP_LINE_COLOUR_KEY]
     predicted_line_colour = option_dict[PREDICTED_LINE_COLOUR_KEY]
-    main_line_width = option_dict[MAIN_LINE_WIDTH_KEY] / 1.4
+    main_line_width = option_dict[MAIN_LINE_WIDTH_KEY] / 1.2
 
     try:
         nwp_temperatures_deg_c = sounding_dict[radiosonde_utils.NWP_TEMPERATURE_COLUMN_KEY] * \
@@ -323,7 +326,7 @@ def plot_nwp_ml_sounding(sounding_dict, title_string=None, option_dict=None, fil
         skewt_object.plot(
             pressure, nwp_temperatures_deg_c,
             color=colour_from_numpy_to_tuple(nwp_line_colour),
-            linewidth=main_line_width, linestyle='solid', label='RAP'
+            linewidth=main_line_width, linestyle='solid', label='RAP' + '$_T$'
         )
     except KeyError:
         pass
@@ -340,16 +343,14 @@ def plot_nwp_ml_sounding(sounding_dict, title_string=None, option_dict=None, fil
     except KeyError:
         pass
     
-    pyplot.legend(fontsize=option_dict[DEFAULT_FONT_SIZE])
-    
     try:
         nwp_dewpoint_deg_c = sounding_dict[radiosonde_utils.NWP_DEWPOINT_COLUMN_KEY] * \
             metpy.units.units.degC
 
         skewt_object.plot(
             pressure, nwp_dewpoint_deg_c,
-            color=colour_from_numpy_to_tuple(nwp_line_colour),
-            linewidth=main_line_width, linestyle='solid'
+            color='tab:blue',
+            linewidth=main_line_width, linestyle='solid', label='RAP' + '$_{Td}$'
         )
     except KeyError:
         pass
@@ -366,6 +367,8 @@ def plot_nwp_ml_sounding(sounding_dict, title_string=None, option_dict=None, fil
     except KeyError:
         pass
     
+    pyplot.legend(fontsize=option_dict[DEFAULT_FONT_SIZE])
+    
     if file_name:
         pyplot.savefig(file_name, dpi=option_dict[DOTS_PER_INCH])
         pyplot.show()
@@ -374,7 +377,7 @@ def plot_nwp_ml_sounding(sounding_dict, title_string=None, option_dict=None, fil
     return figure_object, skewt_object
 
 
-def plot_monthly_error(monthly_err, months, title_string=None, option_dict=None, file_name=None):
+def plot_monthly_error(monthly_err, months, title_string=None, y_label='RMSE [C]', option_dict=None, file_name=None):
     """Plots the monthly errors
 
     :params
@@ -437,7 +440,7 @@ def plot_monthly_error(monthly_err, months, title_string=None, option_dict=None,
     if title_string:
         ax.set_title(title_string)
     
-    ax.set_ylabel('RMSE [C]');
+    ax.set_ylabel(y_label);
     
     # TODO: varaible months index into list 
     pyplot.setp(ax, xticks=numpy.unique(months),

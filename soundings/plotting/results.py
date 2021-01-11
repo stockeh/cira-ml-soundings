@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from soundings.deep_learning import mlutilities as ml
 from soundings.plotting import radiosonde_plotting
 
-def plot_altitude_rmse_verticle_2(ml_rmse, ml_mean_rmse, rap_rmse, rap_mean_rmse, file_name=None):
+def plot_altitude_rmse_verticle_2(ml_rmse, ml_mean_rmse, rap_rmse, rap_mean_rmse, title='', file_name=None):
     """
     Plot the RMSE over different altitudes for some NeuralNetwork architecture.
 
@@ -28,7 +28,7 @@ def plot_altitude_rmse_verticle_2(ml_rmse, ml_mean_rmse, rap_rmse, rap_mean_rmse
     
     if file_name:
         default_font = 14
-        figure_width = 10
+        figure_width = 6
         figure_height = 6
         line_width = 2.5
         
@@ -67,6 +67,7 @@ def plot_altitude_rmse_verticle_2(ml_rmse, ml_mean_rmse, rap_rmse, rap_mean_rmse
     
     axs.tick_params(axis='x', labelsize=default_font)
     axs.tick_params(axis='y', labelsize=default_font)
+    axs.set_title(title, fontsize=default_font)
     axs.grid(True)
     
     if file_name:
