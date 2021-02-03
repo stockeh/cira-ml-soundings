@@ -331,18 +331,6 @@ def plot_nwp_ml_sounding(sounding_dict, title_string=None, option_dict=None, fil
     except KeyError:
         pass
     
-    try: 
-        predicted_temperatures_deg_c = sounding_dict[radiosonde_utils.PREDICTED_TEMPERATURE_COLUMN_KEY] * \
-            metpy.units.units.degC
-
-        skewt_object.plot(
-            pressure, predicted_temperatures_deg_c,
-            color=colour_from_numpy_to_tuple(predicted_line_colour),
-            linewidth=main_line_width, linestyle='solid', label='ML'
-        )
-    except KeyError:
-        pass
-    
     try:
         nwp_dewpoint_deg_c = sounding_dict[radiosonde_utils.NWP_DEWPOINT_COLUMN_KEY] * \
             metpy.units.units.degC
@@ -356,13 +344,25 @@ def plot_nwp_ml_sounding(sounding_dict, title_string=None, option_dict=None, fil
         pass
     
     try: 
+        predicted_temperatures_deg_c = sounding_dict[radiosonde_utils.PREDICTED_TEMPERATURE_COLUMN_KEY] * \
+            metpy.units.units.degC
+
+        skewt_object.plot(
+            pressure, predicted_temperatures_deg_c,
+            color='tab:purple',
+            linewidth=main_line_width, linestyle='solid', label='ML' + '$_T$'
+        )
+    except KeyError:
+        pass
+    
+    try: 
         predicted_dewpoint_deg_c = sounding_dict[radiosonde_utils.PREDICTED_DEWPOINT_COLUMN_KEY] * \
             metpy.units.units.degC
 
         skewt_object.plot(
             pressure, predicted_dewpoint_deg_c,
-            color=colour_from_numpy_to_tuple(predicted_line_colour),
-            linewidth=main_line_width, linestyle='solid'
+            color='tab:olive',
+            linewidth=main_line_width, linestyle='solid', label='ML' + '$_{Td}$'
         )
     except KeyError:
         pass
