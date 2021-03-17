@@ -52,7 +52,7 @@ def loadnn(path):
 
 class NeuralNetwork():
     def __init__(self, n_inputs, n_hiddens_list, n_outputs, activation='tanh',
-                 batchnorm=False, dropout=False, seed=None):
+                 batchnorm=False, dropout=False, regularization=False, seed=None):
 
         if not isinstance(n_hiddens_list, list):
             raise Exception(
@@ -66,16 +66,18 @@ class NeuralNetwork():
         self.n_hiddens_list = n_hiddens_list
         self.n_outputs = n_outputs
 
+        kernel_regularizer = tf.keras.regularizers.l2(0.001) if regularization else None
+        
         X = Z = tf.keras.Input(shape=(n_inputs,))
         if not (n_hiddens_list == [] or n_hiddens_list == [0]):
             for i, units in enumerate(n_hiddens_list):
-                Z = tf.keras.layers.Dense(units)(Z)
+                Z = tf.keras.layers.Dense(units, kernel_regularizer=kernel_regularizer)(Z)
                 if batchnorm:
                     Z = tf.keras.layers.BatchNormalization()(Z)
                 Z = tf.keras.layers.Activation(activation)(Z)
                 if dropout:
                     Z = tf.keras.layers.Dropout(0.20)(Z)
-        Y = tf.keras.layers.Dense(n_outputs)(Z)
+        Y = tf.keras.layers.Dense(n_outputs, kernel_regularizer=kernel_regularizer)(Z)
         self.model = tf.keras.Model(inputs=X, outputs=Y)
 
         self.Xmeans = None
@@ -205,9 +207,8 @@ class NeuralNetwork():
                                     tf.keras.metrics.MeanAbsoluteError()])
                            # metrics=[metrics.unstd_mse(self._unstandardizeT),
                            #         metrics.unstd_truncated_mse(self._unstandardizeT),
-                           #         metrics.unstd_rmse(self._unstandardizeT)])
-        callback = [] 
-        # [tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=1e-1, patience=10)] if validation is not None else []
+                           #         metrics.unstd_rmse(self._unstandardizeT)]) 0.001
+        callback = [tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=1e-3, patience=10)] if validation is not None else []
         if verbose:
             callback.append(callbacks.TrainLogger(n_epochs, step=n_epochs//5))
 
@@ -652,8 +653,8 @@ class MultiConvolutionalNeuralNetwork():
     def __init__(self, n_rap_inputs, n_im_inputs, n_hiddens_list,
                  n_units_in_conv_layers, kernels_size_and_stride,
                  n_outputs, rap_activation='relu', dense_activation='tanh', 
-                 batchnorm=False, dropout=False, seed=None):
-
+                 batchnorm=False, dropout=False, regularization=False, seed=None):
+        
         if n_im_inputs is not None:
             assert ((len(n_im_inputs) == 3)), f'Image must be HxWxC dimensions, {n_im_inputs}'
         assert (isinstance(n_hiddens_list, list)), f'{type(self).__name__}: n_hiddens_list must be a list.'
@@ -671,11 +672,14 @@ class MultiConvolutionalNeuralNetwork():
         self.kernels_size_and_stride = kernels_size_and_stride
         self.n_outputs = n_outputs
         
+        kernel_regularizer = tf.keras.regularizers.l2(0.001) if regularization else None
+        
         # RAP Input
         X1 = Z1 = tf.keras.Input(shape=n_rap_inputs, name='rap')
 
         for (kernel, stride), units in zip(kernels_size_and_stride, n_units_in_conv_layers):
-            Z1 = tf.keras.layers.Conv1D(units, kernel_size=kernel, strides=stride, padding='same')(Z1)
+            Z1 = tf.keras.layers.Conv1D(units, kernel_size=kernel, kernel_regularizer=kernel_regularizer,
+                                        strides=stride, padding='same')(Z1)
             if batchnorm:
                 Z1 = tf.keras.layers.BatchNormalization()(Z1)
             Z1 = tf.keras.layers.Activation(rap_activation)(Z1)
@@ -697,11 +701,10 @@ class MultiConvolutionalNeuralNetwork():
             for units in n_hiddens_list:
                 if dropout:
                     Z = tf.keras.layers.Dropout(0.20)(Z) 
-                Z = tf.keras.layers.Dense(units, activation=dense_activation)(Z) 
-                # kernel_regularizer=tf.keras.regularizers.l2(0.0001)
+                Z = tf.keras.layers.Dense(units, activation=dense_activation, kernel_regularizer=kernel_regularizer)(Z) 
         if dropout:
             Z = tf.keras.layers.Dropout(0.20)(Z) 
-        Y = tf.keras.layers.Dense(n_outputs, name='out')(Z)
+        Y = tf.keras.layers.Dense(n_outputs, name='out', kernel_regularizer=kernel_regularizer)(Z)
         self.model = tf.keras.Model(inputs=inputs, outputs=Y)            
 
         self.RAPmeans  = None
@@ -824,8 +827,7 @@ class MultiConvolutionalNeuralNetwork():
                                     tf.keras.metrics.MeanSquaredError(),
                                     tf.keras.metrics.MeanAbsoluteError()])
 
-        callback = [] 
-        # [tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=1e-1, patience=10)] if validation is not None else []
+        callback = [tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=1e-3, patience=10)] if validation is not None else []
         if verbose:
             callback.append(callbacks.TrainLogger(n_epochs, step=n_epochs//5))
 
