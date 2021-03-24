@@ -15,17 +15,17 @@ from tensorflow.python.keras import backend as K
 from tensorflow.python.ops import math_ops
 from tensorflow.python.framework import ops
 
-def weighted_mean_squared_error(y_true, y_pred, scale, lmda):
-    """exponential decay weighted MSE"""
-    y_pred = ops.convert_to_tensor_v2(y_pred)
-    y_true = math_ops.cast(y_true, y_pred.dtype)
-    diff = math_ops.squared_difference(y_pred, y_true)
 
-    x = np.arange(diff.shape[1])
-    y = lambda x: scale * np.exp(-lmda * x) + 1
-    diff *= y(x)
+# def weighted_mean_squared_error(y_true, y_pred, scale, lmda):
+#     """exponential decay weighted MSE"""
+#     y_pred = ops.convert_to_tensor_v2(y_pred)
+#     y_true = math_ops.cast(y_true, y_pred.dtype)
+#     y = scale * np.exp(-lmda * np.arange(y_true.shape[1])) + 0.2
+#     return K.mean(y * math_ops.abs(y_pred - y_true))
 
-    return K.mean(diff, axis=-1)
+
+def weighted_loss(y_true, y_pred, weight):
+    return K.mean(weight * math_ops.abs(y_pred - y_true))
 
 def seperated_mean_squared_error(y_true, y_pred):
     y_pred = ops.convert_to_tensor_v2(y_pred)
@@ -138,7 +138,6 @@ class NeuralNetwork():
     def _unstandardizeT(self, Ts):
         return self.Tstds * Ts + self.Tmeans
     
-    
 #     def _setup_standardize(self, X, T):
 #         if self.Xmax is None:
 #             self.Xmax = X.max(axis=0)
@@ -198,6 +197,15 @@ class NeuralNetwork():
             loss = tf.keras.losses.MSE
         elif loss_f == 'MAE':
             loss = tf.keras.losses.MAE
+        elif loss_f == 'wloss':
+            scale  = 3.75
+            lmda   = 0.01
+            weight = scale * np.exp(-lmda * np.arange(self.n_outputs))+0.25
+            # linear decay
+            # ones = K.ones(self.n_outputs) # a simple vector with ones shaped as (512,)
+            # idx = K.cumsum(ones) # similar to a 'range(1,513)'
+            # weight = (1/idx)
+            loss = lambda y_true,y_pred: weighted_loss(y_true, y_pred, weight)
         else: # custom loss function
             loss = loss_f
             
@@ -205,9 +213,6 @@ class NeuralNetwork():
                            metrics=[tf.keras.metrics.RootMeanSquaredError(),
                                     tf.keras.metrics.MeanSquaredError(),
                                     tf.keras.metrics.MeanAbsoluteError()])
-                           # metrics=[metrics.unstd_mse(self._unstandardizeT),
-                           #         metrics.unstd_truncated_mse(self._unstandardizeT),
-                           #         metrics.unstd_rmse(self._unstandardizeT)]) 0.001
         callback = [tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=1e-3, patience=10)] if validation is not None else []
         if verbose:
             callback.append(callbacks.TrainLogger(n_epochs, step=n_epochs//5))
@@ -373,7 +378,7 @@ class SkipNeuralNetwork():
     def __init__(self, n_rap_inputs, n_im_inputs, n_hiddens_list,
                  n_units_in_conv_layers, kernels_size_and_stride,
                  n_outputs, rap_activation='relu', dense_activation='tanh', 
-                 batchnorm=False, dropout=False, seed=None):
+                 batchnorm=False, dropout=False, regularization=False, seed=None):
 
         if n_im_inputs is not None:
             assert ((len(n_im_inputs) == 3)), f'Image must be HxWxC dimensions, {n_im_inputs}'
@@ -392,8 +397,8 @@ class SkipNeuralNetwork():
         self.kernels_size_and_stride = kernels_size_and_stride
         self.n_outputs = n_outputs
         
-        l2_rate = 1e-5
         dropout_rate = 0.1
+        kernel_regularizer = tf.keras.regularizers.l2(0.0001) if regularization else None
         
         # encoder
         X1 = Z1 = tf.keras.Input(shape=n_rap_inputs, name='rap')
@@ -402,11 +407,11 @@ class SkipNeuralNetwork():
                                                           n_units_in_conv_layers[:])):
             Z1 = tf.keras.layers.Conv1D(units, kernel_size=kernel,
                                         strides=stride, padding='same',
-                                        kernel_regularizer=tf.keras.regularizers.l2(l2_rate))(Z1)
+                                        kernel_regularizer=kernel_regularizer)(Z1)
             Z1 = tf.keras.layers.Activation(rap_activation)(Z1)
             Z1 = tf.keras.layers.Conv1D(units, kernel_size=kernel,
                                         strides=stride, padding='same', name=f'skip_conv1d_{i}',
-                                        kernel_regularizer=tf.keras.regularizers.l2(l2_rate))(Z1)
+                                        kernel_regularizer=kernel_regularizer)(Z1)
             Z1 = tf.keras.layers.Activation(rap_activation)(Z1)
             Z1 = tf.keras.layers.MaxPooling1D(pool_size=2)(Z1)
             if dropout:
@@ -420,7 +425,7 @@ class SkipNeuralNetwork():
                 kernel_size=kernels_size_and_stride[-1][0], 
                 strides=kernels_size_and_stride[-1][1], 
                 padding='same',
-                kernel_regularizer=tf.keras.regularizers.l2(l2_rate))(Z1)
+                kernel_regularizer=kernel_regularizer)(Z1)
         Z1 = tf.keras.layers.Activation(rap_activation)(Z1)
         
         # IM Input
@@ -431,7 +436,7 @@ class SkipNeuralNetwork():
             Z1 = tf.keras.layers.Flatten()(Z1)
             Z1 = tf.keras.layers.Concatenate(axis=1)([Z1, Z2]) # Join IM & RAP
             Z1 = tf.keras.layers.Dense(np.prod(bottleneck_shape),
-                                       kernel_regularizer=tf.keras.regularizers.l2(l2_rate))(Z1)
+                                       kernel_regularizer=kernel_regularizer)(Z1)
             Z1 = tf.keras.layers.Activation(rap_activation)(Z1)
             Z = tf.keras.layers.Reshape(bottleneck_shape)(Z1)
             inputs = [X1, X2]
@@ -447,14 +452,14 @@ class SkipNeuralNetwork():
                                                  skips):
             Z = tf.keras.layers.Conv1D(units, kernel_size=kernel, 
                                        strides=stride, padding='same',
-                                       kernel_regularizer=tf.keras.regularizers.l2(l2_rate))(Z)
+                                       kernel_regularizer=kernel_regularizer)(Z)
             Z = tf.keras.layers.Activation(rap_activation)(Z)
             Z = tf.keras.layers.UpSampling1D(size=2)(Z)
             Z = tf.keras.layers.Concatenate(axis=2)([Z, skip.output])
             # Z = tf.keras.layers.Add()([Z, skip.output])
             Z = tf.keras.layers.Conv1D(units, kernel_size=kernel, 
                                        strides=stride, padding='same',
-                                       kernel_regularizer=tf.keras.regularizers.l2(l2_rate))(Z)
+                                       kernel_regularizer=kernel_regularizer)(Z)
             Z = tf.keras.layers.Activation(rap_activation)(Z)
             if dropout:
                 Z = tf.keras.layers.Dropout(dropout_rate)(Z)
@@ -463,7 +468,7 @@ class SkipNeuralNetwork():
         Z = tf.keras.layers.Conv1D(
                 n_outputs / n_rap_inputs[0], kernel_size=kernels_size_and_stride[0][0], 
                 strides=kernels_size_and_stride[0][1], padding='same',
-                kernel_regularizer=tf.keras.regularizers.l2(l2_rate))(Z)
+                kernel_regularizer=kernel_regularizer)(Z)
 
         # add only the temperature profile back to Z.
         Z = tf.keras.layers.Add()([X1[:,:,1:3], Z]) # temperature & dewpoint, e.g. (256,4) + (256,2)
@@ -598,8 +603,11 @@ class SkipNeuralNetwork():
             loss = tf.keras.losses.MAE
         elif loss_f == 'Huber':
             loss = tf.keras.losses.Huber()
-        elif loss_f == 'WMSE':
-            loss = [lambda y_true,y_pred: weighted_mean_squared_error(y_true, y_pred, scale=2, lmda=0.03)]
+        elif loss_f == 'wloss':
+            scale  = 3.75
+            lmda   = 0.01
+            weight = scale * np.exp(-lmda * np.arange(self.n_outputs))+0.25
+            loss = lambda y_true,y_pred: weighted_loss(y_true, y_pred, weight)
         elif loss_f == 'SMSE':
             loss = seperated_mean_squared_error
         else: # custom loss function
@@ -611,8 +619,7 @@ class SkipNeuralNetwork():
                                     tf.keras.metrics.MeanSquaredError(),
                                     tf.keras.metrics.MeanAbsoluteError()])
 
-        callback = [] 
-        # [tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=1e-1, patience=10)] if validation is not None else []
+        callback = [tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=1e-3, patience=10)] if validation is not None else []
         if verbose:
             callback.append(callbacks.TrainLogger(n_epochs, step=n_epochs//5))
 
@@ -819,6 +826,11 @@ class MultiConvolutionalNeuralNetwork():
             loss = tf.keras.losses.MSE
         elif loss_f == 'MAE':
             loss = tf.keras.losses.MAE
+        elif loss_f == 'wloss':
+            scale  = 3.75
+            lmda   = 0.01
+            weight = scale * np.exp(-lmda * np.arange(self.n_outputs))+0.25
+            loss = lambda y_true,y_pred: weighted_loss(y_true, y_pred, weight)
         else: # custom loss function
             loss = loss_f
             

@@ -7,6 +7,7 @@ from soundings.deep_learning import mlutilities as ml
 
 def compute_profile_rmses(Y, T, surface_error=25):
     """
+    note: mean_rmse is the same as total RMSE
     ---
     params:
         Y : np.array (None, 256, N)

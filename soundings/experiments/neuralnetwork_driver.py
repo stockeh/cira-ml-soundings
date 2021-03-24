@@ -7,7 +7,7 @@ import tensorflow as tf
 from soundings.experiments.experiment_interface import ExperimentInterface
 from soundings.experiments import results as results_calc
 from soundings.deep_learning import tf_neuralnetwork as nn
-
+from soundings.deep_learning import mlutilities as ml
 
 class NeuralNetworkDriver(ExperimentInterface):
     
@@ -122,23 +122,34 @@ class NeuralNetworkDriver(ExperimentInterface):
                         r[key] = val
 
                     TEMP, DEWPT = 0, 1
-                    sets = ['train', 'test'] # val
+                    sets = ['train', 'val', 'test']
                     
                     # (Xv, RAPval  , RAOBval),
-                    for j, (X, RAP, T) in enumerate([(Xt, RAPtrain, RAOBtrain),
-                                                     (Xe, RAPtest , RAOBtest)]):
+                    for j, (X, T, RAP, RAOB) in enumerate([(Xt, Tt, RAPtrain, RAOBtrain),
+                                                           (Xv, Tv, RAPval  , RAOBval),
+                                                           (Xe, Te, RAPtest , RAOBtest)]):
 
-                        Y = nnet.use(X).reshape(RAP[:,:,rap_output_dims].shape) # (None, 256, N)
+                        Y = nnet.use(X)
+                        
+                        surface_error=25
+                        r[f'ml_total_{sets[j]}_rmse'] = ml.rmse(Y, T)
+                        r[f'ml_total_{sets[j]}_rmse_sfc'] = ml.rmse(Y[:,:surface_error*2], T[:,:surface_error*2])
+                        
+                        Y = Y.reshape(RAP[:,:,rap_output_dims].shape) # (None, 256, N)
 
                         (rmse, mean_rmse,
-                         rmse_sfc, mean_rmse_sfc) = results_calc.compute_profile_rmses(Y[:,:,TEMP], T[:, :, 1])
+                         rmse_sfc, mean_rmse_sfc) = results_calc.compute_profile_rmses(Y[:,:,TEMP], 
+                                                                                       RAOB[:, :, 1], 
+                                                                                       surface_error)
                         r[f'ml_temperature_{sets[j]}_rmse'] = rmse.tolist()
                         r[f'ml_temperature_{sets[j]}_mean_rmse'] = mean_rmse
                         r[f'ml_temperature_{sets[j]}_rmse_sfc'] = rmse_sfc.tolist()
                         r[f'ml_temperature_{sets[j]}_mean_rmse_sfc'] = mean_rmse_sfc
 
                         (rmse, mean_rmse,
-                         rmse_sfc, mean_rmse_sfc) = results_calc.compute_profile_rmses(Y[:,:,DEWPT], T[:, :, 2])
+                         rmse_sfc, mean_rmse_sfc) = results_calc.compute_profile_rmses(Y[:,:,DEWPT], 
+                                                                                       RAOB[:, :, 2], 
+                                                                                       surface_error)
                         r[f'ml_dewpoint_{sets[j]}_rmse'] = rmse.tolist()
                         r[f'ml_dewpoint_{sets[j]}_mean_rmse'] = mean_rmse
                         r[f'ml_dewpoint_{sets[j]}_rmse_sfc'] = rmse_sfc.tolist()

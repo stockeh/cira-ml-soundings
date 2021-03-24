@@ -8,7 +8,7 @@ from ast import literal_eval
 from soundings.experiments.experiment_interface import ExperimentInterface
 from soundings.experiments import results as results_calc
 from soundings.deep_learning import tf_neuralnetwork as nn
-
+from soundings.deep_learning import mlutilities as ml
 
 class CNNSkipNetworkDriver(ExperimentInterface):
     
@@ -127,8 +127,8 @@ class CNNSkipNetworkDriver(ExperimentInterface):
                                                               [literal_eval(kernels_size_and_stride)]* \
                                                                   len(n_units_in_conv_layers), # all same size
                                                               n_network_outputs, rap_activation=rap_activation,
-                                                              dense_activation=dense_activation, 
-                                                              batchnorm=batchnorm, dropout=dropout, regularization=regularization)
+                                                              dense_activation=dense_activation, batchnorm=batchnorm, 
+                                                              dropout=dropout, regularization=regularization)
                     nnet.model.summary()
                     nnet.train(Xtr, Xti, Tt, n_epochs, batch_size, method=optim, verbose=False,
                                learning_rate=lr, validation=(Xvr, Xvi, Tv), loss_f=loss)
@@ -152,22 +152,32 @@ class CNNSkipNetworkDriver(ExperimentInterface):
                     TEMP, DEWPT = 0, 1
                     sets = ['train', 'val', 'test']
 
-                    for j, (Xr, Xi, RAP, T) in enumerate([(Xtr, Xti, RAPtrain, RAOBtrain),
-                                                          (Xvr, Xvi, RAPval  , RAOBval),
-                                                          (Xer, Xei, RAPtest , RAOBtest)]):
+                    for j, (Xr, Xi, T, RAP, RAOB) in enumerate([(Xtr, Xti, Tt, RAPtrain, RAOBtrain),
+                                                                (Xvr, Xvi, Tv, RAPval  , RAOBval),
+                                                                (Xer, Xei, Te, RAPtest , RAOBtest)]):
 
                         X = {'rap': Xr, 'im': Xi} if Xi is not None else {'rap': Xr}
-                        Y = nnet.use(X).reshape(RAP[:,:,rap_output_dims].shape) # (None, 256, N)
+                        Y = nnet.use(X)
+                        
+                        surface_error=25
+                        r[f'ml_total_{sets[j]}_rmse'] = ml.rmse(Y, T)
+                        r[f'ml_total_{sets[j]}_rmse_sfc'] = ml.rmse(Y[:,:surface_error*2], T[:,:surface_error*2])
+                        
+                        Y = Y.reshape(RAP[:,:,rap_output_dims].shape) # (None, 256, N)
 
                         (rmse, mean_rmse,
-                         rmse_sfc, mean_rmse_sfc) = results_calc.compute_profile_rmses(Y[:,:,TEMP], T[:, :, 1])
+                         rmse_sfc, mean_rmse_sfc) = results_calc.compute_profile_rmses(Y[:,:,TEMP], 
+                                                                                       RAOB[:, :, 1], 
+                                                                                       surface_error)
                         r[f'ml_temperature_{sets[j]}_rmse'] = rmse.tolist()
                         r[f'ml_temperature_{sets[j]}_mean_rmse'] = mean_rmse
                         r[f'ml_temperature_{sets[j]}_rmse_sfc'] = rmse_sfc.tolist()
                         r[f'ml_temperature_{sets[j]}_mean_rmse_sfc'] = mean_rmse_sfc
 
                         (rmse, mean_rmse,
-                         rmse_sfc, mean_rmse_sfc) = results_calc.compute_profile_rmses(Y[:,:,DEWPT], T[:, :, 2])
+                         rmse_sfc, mean_rmse_sfc) = results_calc.compute_profile_rmses(Y[:,:,DEWPT], 
+                                                                                       RAOB[:, :, 2], 
+                                                                                       surface_error)
                         r[f'ml_dewpoint_{sets[j]}_rmse'] = rmse.tolist()
                         r[f'ml_dewpoint_{sets[j]}_mean_rmse'] = mean_rmse
                         r[f'ml_dewpoint_{sets[j]}_rmse_sfc'] = rmse_sfc.tolist()
