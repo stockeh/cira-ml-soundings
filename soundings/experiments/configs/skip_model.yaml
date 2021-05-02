@@ -1,4 +1,4 @@
-results_file: /mnt/data1/stock/mlsoundings/results/loss_overfit_alley_skip_model_temperature_dewpoint.csv
+results_file: /mnt/data1/stock/mlsoundings/results/goes_alley_skip_model_temperature_dewpoint.csv
 model:
     network: SkipNeuralNetwork
     n_hiddens_list:
@@ -18,12 +18,12 @@ model:
     learning_rates: [0.0001]
     rap_activations: [relu]
     dense_activations: [relu]
-    losses: [wloss, MSE, MAE]
+    losses: [wloss]
     epochs: [125]
     batch_sizes: [128]
-    dropout: [False, True]
-    batchnorm: [False, True]
-    regularization: [False, True]
+    dropout: [False]
+    batchnorm: [False]
+    regularization: [False]
     repeat_factor: 1
 data:
     saved_f: /mnt/data1/stock/mlsoundings/preprocessed_alley.npz
@@ -38,6 +38,9 @@ data:
 #             - [0, 1, 2] # lpi, ...
     goes:
         input_channels:
-#             - []
+            - [3, 4, 5, 6, 7]
+            - [0, 2, 3, 4, 5, 6, 7]
+            - [0, 1, 2, 6]
+            - [3, 4, 5, 7]
             - [0, 1, 2, 3, 4, 5, 6, 7]
 

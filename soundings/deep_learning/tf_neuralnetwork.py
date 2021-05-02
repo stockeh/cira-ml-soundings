@@ -201,6 +201,7 @@ class NeuralNetwork():
             scale  = 3.75
             lmda   = 0.01
             weight = scale * np.exp(-lmda * np.arange(self.n_outputs))+0.25
+
             # linear decay
             # ones = K.ones(self.n_outputs) # a simple vector with ones shaped as (512,)
             # idx = K.cumsum(ones) # similar to a 'range(1,513)'
@@ -247,8 +248,9 @@ class NeuralNetwork():
 
 class ConvolutionalNeuralNetwork(NeuralNetwork):
     def __init__(self, n_inputs, n_units_in_conv_layers,
-                 kernels_size_and_stride, n_outputs, activation='tanh',
-                 batchnorm=False, dropout=False, seed=None):
+                 kernels_size_and_stride, n_outputs, n_hiddens_list=[0], 
+                 activation='tanh', dense_activation='tanh', 
+                 batchnorm=False, dropout=False, cape_cin=False, seed=None):
 
         if not isinstance(n_units_in_conv_layers, (list, tuple)):
             raise Exception(
@@ -260,6 +262,9 @@ class ConvolutionalNeuralNetwork(NeuralNetwork):
 
         self.seed = seed
         self._set_seed()
+        np.random.seed(self.seed)
+        random.seed(self.seed)
+        tf.random.set_seed(self.seed)
         tf.keras.backend.clear_session()
 
         self.n_inputs = n_inputs
@@ -267,6 +272,8 @@ class ConvolutionalNeuralNetwork(NeuralNetwork):
         self.kernels_size_and_stride = kernels_size_and_stride
         self.n_outputs = n_outputs
 
+        dropout_rate = 0.20
+        
         X = Z = tf.keras.Input(shape=n_inputs)
         for (kernel, stride), units in zip(kernels_size_and_stride, n_units_in_conv_layers):
             Z = tf.keras.layers.Conv1D(
@@ -275,10 +282,31 @@ class ConvolutionalNeuralNetwork(NeuralNetwork):
                 Z = tf.keras.layers.BatchNormalization()(Z)
             Z = tf.keras.layers.Activation(activation)(Z)
             Z = tf.keras.layers.MaxPooling1D(pool_size=2)(Z)
-            if dropout:
-                Z = tf.keras.layers.Dropout(0.20)(Z)
-        Y = tf.keras.layers.Dense(n_outputs)(tf.keras.layers.Flatten()(Z))
+        if dropout:
+            Z = tf.keras.layers.Dropout(dropout_rate)(Z)
+                
+        Z = tf.keras.layers.Flatten()(Z)
+        
+        # Dense Layers 
+        if not (n_hiddens_list == [] or n_hiddens_list == [0]):
+            for units in n_hiddens_list:
+                Z = tf.keras.layers.Dense(units)(Z) 
+                if batchnorm:
+                    Z = tf.keras.layers.BatchNormalization()(Z)
+                Z = tf.keras.layers.Activation(dense_activation)(Z)
+                if dropout:
+                    Z = tf.keras.layers.Dropout(dropout_rate)(Z) 
 
+        # NOTE: this does not work as intended. Outputs are normalized, 
+        # and would have to be unnormalized first.
+        if cape_cin:
+            CAPE = tf.keras.layers.Dense(1, name='cape', activation='relu')(Z)
+            CIN  = tf.keras.layers.multiply([tf.keras.layers.Dense(1, activation='relu')(Z), 
+                                             np.array([-1.0], dtype='float32')], name='cin')
+            Y = tf.keras.layers.concatenate([CAPE, CIN])
+        else:
+            Y = tf.keras.layers.Dense(n_outputs, name='out')(Z)
+        
         self.model = tf.keras.Model(inputs=X, outputs=Y)
 
         self.Xmeans = None
@@ -410,9 +438,9 @@ class SkipNeuralNetwork():
                                         kernel_regularizer=kernel_regularizer)(Z1)
             Z1 = tf.keras.layers.Activation(rap_activation)(Z1)
             Z1 = tf.keras.layers.Conv1D(units, kernel_size=kernel,
-                                        strides=stride, padding='same', name=f'skip_conv1d_{i}',
+                                        strides=stride, padding='same',
                                         kernel_regularizer=kernel_regularizer)(Z1)
-            Z1 = tf.keras.layers.Activation(rap_activation)(Z1)
+            Z1 = tf.keras.layers.Activation(rap_activation, name=f'skip_conv1d_activation_{i}')(Z1)
             Z1 = tf.keras.layers.MaxPooling1D(pool_size=2)(Z1)
             if dropout:
                 Z1 = tf.keras.layers.Dropout(dropout_rate)(Z1)
@@ -607,6 +635,11 @@ class SkipNeuralNetwork():
             scale  = 3.75
             lmda   = 0.01
             weight = scale * np.exp(-lmda * np.arange(self.n_outputs))+0.25
+            
+#             scale  = 9.75
+#             lmda   = 0.02
+#             weight = scale * np.exp(-lmda * np.arange(self.n_outputs))+0.25
+            
             loss = lambda y_true,y_pred: weighted_loss(y_true, y_pred, weight)
         elif loss_f == 'SMSE':
             loss = seperated_mean_squared_error
@@ -619,7 +652,7 @@ class SkipNeuralNetwork():
                                     tf.keras.metrics.MeanSquaredError(),
                                     tf.keras.metrics.MeanAbsoluteError()])
 
-        callback = [tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=1e-3, patience=10)] if validation is not None else []
+        callback = [tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=1e-4, patience=10)] if validation is not None else []
         if verbose:
             callback.append(callbacks.TrainLogger(n_epochs, step=n_epochs//5))
 

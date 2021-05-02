@@ -150,7 +150,7 @@ def _init_skewT(option_dict):
     return figure_object, skewt_object
 
 
-def plot_sounding(sounding_dict, title_string=None, option_dict=None, file_name=None):
+def plot_sounding(sounding_dict, title_string=None, option_dict=None, file_name=None, cape_cin=False):
     """Plots atmospheric sounding.
 
     H = number of vertical levels in sounding
@@ -217,6 +217,23 @@ def plot_sounding(sounding_dict, title_string=None, option_dict=None, file_name=
     skewt_object.ax.set_xlabel('Temperature [C]')
     skewt_object.ax.set_ylabel('Pressure [mb]')
     
+    if cape_cin:
+        # Calculate LCL height and plot as black dot. Because `p`'s first value is
+        # ~1000 mb and its last value is ~250 mb, the `0` index is selected for
+        # `p`, `T`, and `Td` to lift the parcel from the surface. If `p` was inverted,
+        # i.e. start from low value, 250 mb, to a high value, 1000 mb, the `-1` index
+        # should be selected.
+        lcl_pressure, lcl_temperature = metpy.calc.lcl(pressure[0], temperature[0], dewpoint[0])
+        skewt_object.plot(lcl_pressure, lcl_temperature, 'ko', markerfacecolor='black')
+
+        # Calculate full parcel profile and add to plot as black line
+        prof = metpy.calc.parcel_profile(pressure, temperature[0], dewpoint[0]).to('degC')
+        skewt_object.plot(pressure, prof, 'k', linewidth=2)
+
+        # Shade areas of CAPE and CIN
+        skewt_object.shade_cin(pressure, temperature, prof)
+        skewt_object.shade_cape(pressure, temperature, prof)
+    
     if file_name:
         pyplot.savefig(file_name, dpi=option_dict[DOTS_PER_INCH])
         pyplot.show()
@@ -279,7 +296,7 @@ def plot_predicted_sounding(sounding_dict, title_string=None, option_dict=None, 
     return figure_object, skewt_object
 
 
-def plot_nwp_ml_sounding(sounding_dict, title_string=None, option_dict=None, file_name=None):
+def plot_nwp_ml_sounding(sounding_dict, title_string=None, option_dict=None, file_name=None, cape_cin=False):
     """Plots radiosonde, nwp profile, and ML prediction.
 
     H = number of vertical levels in sounding
@@ -311,7 +328,7 @@ def plot_nwp_ml_sounding(sounding_dict, title_string=None, option_dict=None, fil
         _init_save_img(option_dict)
 
     figure_object, skewt_object = plot_sounding(
-        sounding_dict, title_string, option_dict)
+        sounding_dict, title_string, option_dict, cape_cin=cape_cin)
     
     pressure = radiosonde_utils.convert_metpy_pressure(sounding_dict)
     

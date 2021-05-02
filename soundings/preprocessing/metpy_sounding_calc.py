@@ -11,7 +11,7 @@ from soundings.experiments import results as results_calc
 from soundings.preprocessing import dataloader as dl
 
 def save_results(dataset, product, results):
-    f = f'/mnt/data1/stock/mlsoundings/{dataset}_{product}.npy'
+    f = f'/mnt/data1/stock/mlsoundings/alley_{dataset}_{product}.npy'
     np.save(f, results)
     
 
@@ -75,10 +75,14 @@ def main(dataset, product):
 
     start_t = time.time()
     
-    f = '/mnt/data1/stock/mlsoundings/preprocessed.npz'
-    container = np.load(f)
-    r = container[dataset]
-    container.close()
+    if dataset == 'ml':
+        f = '/mnt/data1/stock/mlsoundings/mltest_alley.npy'
+        r = np.load(f)
+    else:
+        f = '/mnt/data1/stock/mlsoundings/preprocessed_alley.npz'
+        container = np.load(f)
+        r = container[dataset]
+        container.close()
     
     if product == 'cape_cin':
         results = retrieve_cape_cin(r)
